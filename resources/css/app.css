@@ -1,0 +1,17 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/* Попередня палітра з ТЗ (частина 1, п. 3.2); шрифти буде обрано на етапі дизайну */
+@theme {
+    --color-ink: #141412;
+    --color-pine: #1f2a24;
+    --color-paper: #f6f1e7;
+    --color-charcoal: #1b1b19;
+    --color-cream: #efe9dc;
+    --color-accent: #c8853b;
+    --color-success: #3f8f5f;
+    --color-danger: #c0463a;
+    --color-warning: #d9a441;
+}
