@@ -31,6 +31,9 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::hex('#1D4ED8'),
             ])
+            // Дзвіночок зі сповіщеннями про нові й скасовані бронювання (частина 2, п. 3.7)
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->navigationGroups([
                 'Меню',
                 'Зали та столики',

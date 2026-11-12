@@ -87,12 +87,6 @@ return [
         'ml' => 'ml',
     ],
 
-    'booking' => [
-        'title' => 'Book a table',
-        'soon' => 'Online booking with a floor plan is coming soon.',
-        'call' => 'Meanwhile, you can book a table by phone:',
-    ],
-
     'footer' => [
         'offer' => 'Terms of service',
         'privacy' => 'Privacy policy',

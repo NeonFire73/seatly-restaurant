@@ -18,14 +18,6 @@ class PageController extends Controller
         return view('site.contacts');
     }
 
-    /**
-     * Тимчасова сторінка: майстер бронювання з'являється на етапі 4.
-     */
-    public function booking(): View
-    {
-        return view('site.booking');
-    }
-
     public function text(string $slug): View
     {
         $page = SiteContent::page($slug);

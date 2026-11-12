@@ -4,7 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon $date
+ * @property bool $is_closed
+ */
 #[Fillable(['date', 'is_closed', 'opens_at', 'closes_at', 'note'])]
 class SpecialDay extends Model
 {

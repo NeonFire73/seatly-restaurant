@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Filament\Resources\Reservations\Pages;
+
+use App\Filament\Resources\Reservations\ReservationActions;
+use App\Filament\Resources\Reservations\ReservationResource;
+use Filament\Actions\ActionGroup;
+use Filament\Resources\Pages\ViewRecord;
+
+class ViewReservation extends ViewRecord
+{
+    protected static string $resource = ReservationResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            ReservationActions::seat(),
+            ReservationActions::complete(),
+            ReservationActions::move(),
+            ActionGroup::make([
+                ReservationActions::editGuest(),
+                ReservationActions::noShow(),
+                ReservationActions::restore(),
+                ReservationActions::cancel(),
+            ]),
+        ];
+    }
+}

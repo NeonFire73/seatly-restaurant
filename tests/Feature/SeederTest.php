@@ -5,6 +5,7 @@ use App\Models\DiningTable;
 use App\Models\Dish;
 use App\Models\Hall;
 use App\Models\MenuCategory;
+use App\Models\Reservation;
 use App\Models\User;
 use App\Models\WorkingHour;
 use Database\Seeders\UserSeeder;
@@ -18,7 +19,9 @@ it('наповнює базу демо-даними', function () {
         ->and(DiningTable::pluck('qr_token')->unique())->toHaveCount(15)
         ->and(MenuCategory::count())->toBe(6)
         ->and(Dish::count())->toBeGreaterThanOrEqual(35)
-        ->and(WorkingHour::count())->toBe(7);
+        ->and(WorkingHour::count())->toBe(7)
+        // Бронювання на найближчий тиждень, без накладок на одному столику
+        ->and(Reservation::live()->where('starts_at', '>', now())->count())->toBeGreaterThan(20);
 
     foreach (UserRole::cases() as $role) {
         expect(User::where('role', $role)->exists())->toBeTrue();

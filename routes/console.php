@@ -1,8 +1,6 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Фонові задачі (частина 2, розділ 8). Запускаються планувальником: `php artisan schedule:work` або cron
+Schedule::command('reservations:mark-no-show')->everyTenMinutes();

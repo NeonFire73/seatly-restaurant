@@ -3,6 +3,8 @@
     'seo' => null,
     'title' => null,
     'description' => null,
+    // Сторінки з персональними даними (бронювання гостя) закриті від індексації
+    'noindex' => false,
 ])
 
 @php
@@ -28,6 +30,9 @@
 
         <title>{{ $pageTitle }}</title>
         <meta name="description" content="{{ $pageDescription }}">
+        @if ($noindex)
+            <meta name="robots" content="noindex, nofollow">
+        @endif
         <link rel="canonical" href="{{ Localization::currentUrlFor(app()->getLocale()) }}">
 
         @foreach (Localization::locales() as $locale)

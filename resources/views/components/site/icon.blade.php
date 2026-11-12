@@ -59,6 +59,29 @@
             <circle cx="12" cy="12" r="8" />
             <circle cx="12" cy="12" r="4.5" />
             @break
+        @case('check')
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+            @break
+        @case('chevron-left')
+            <path d="M15 5l-7 7 7 7" />
+            @break
+        @case('chevron-right')
+            <path d="M9 5l7 7-7 7" />
+            @break
+        @case('minus')
+            <path d="M5 12h14" />
+            @break
+        @case('plus')
+            <path d="M12 5v14M5 12h14" />
+            @break
+        @case('users')
+            <circle cx="9" cy="8" r="3.5" />
+            <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8" />
+            @break
+        @case('alert')
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7.5v5M12 16h.01" />
+            @break
         @case('filter')
             <path d="M4 6h16M7 12h10M10 18h4" />
             @break

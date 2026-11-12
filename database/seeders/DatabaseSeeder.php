@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
             MenuSeeder::class,
             WorkingHourSeeder::class,
             ContentSeeder::class,
+            // Після залів і годин роботи: бронювання ставляться на столики в робочі дні
+            ReservationSeeder::class,
         ]);
     }
 }

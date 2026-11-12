@@ -48,6 +48,26 @@
         </section>
 
         <section class="space-y-4">
+            <h2 class="text-xl font-semibold">Індикатор кроків</h2>
+            <x-booking.steps :steps="['Дата й час', 'Столик', 'Контакти', 'Підтвердження']" :current="2" class="max-w-2xl" />
+        </section>
+
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold">Поля форм</h2>
+            <div class="grid max-w-2xl gap-5 sm:grid-cols-2">
+                <x-form.field label="Текстове поле" for="kit-text" hint="Підказка під полем">
+                    <x-form.input id="kit-text" placeholder="Заповнювач" />
+                </x-form.field>
+                <x-form.field label="Необов'язкове поле" for="kit-optional" optional>
+                    <x-form.input id="kit-optional" type="email" />
+                </x-form.field>
+                <x-form.field label="Багаторядкове поле" for="kit-area" class="sm:col-span-2">
+                    <x-form.input id="kit-area" multiline />
+                </x-form.field>
+            </div>
+        </section>
+
+        <section class="space-y-4">
             <h2 class="text-xl font-semibold">Картки страв</h2>
             <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 @if ($dish)

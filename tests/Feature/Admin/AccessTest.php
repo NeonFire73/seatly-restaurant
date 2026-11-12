@@ -12,6 +12,7 @@ dataset('sections', [
     'зали' => ['/admin/halls', [UserRole::Owner, UserRole::Manager]],
     'столики' => ['/admin/tables', [UserRole::Owner, UserRole::Manager]],
     'персонал' => ['/admin/staff', [UserRole::Owner]],
+    'бронювання' => ['/admin/reservations', [UserRole::Owner, UserRole::Manager, UserRole::Waiter]],
 ]);
 
 it('відкриває розділ лише дозволеним ролям', function (string $url, array $allowed) {

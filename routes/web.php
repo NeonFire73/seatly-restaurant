@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\PageController;
+use App\Http\Controllers\Site\ReservationController;
 use App\Http\Middleware\SetLocale;
 use App\Support\Localization;
 use Illuminate\Support\Facades\Route;
@@ -13,7 +14,9 @@ use Illuminate\Support\Facades\Route;
 $publicRoutes = function (): void {
     Route::get('/', HomeController::class)->name('home');
     Route::view('/menu', 'site.menu')->name('menu');
-    Route::get('/booking', [PageController::class, 'booking'])->name('booking');
+    Route::view('/booking', 'site.booking')->name('booking');
+    Route::get('/booking/{token}', [ReservationController::class, 'show'])->name('reservation.show');
+    Route::get('/booking/{token}/calendar.ics', [ReservationController::class, 'calendar'])->name('reservation.calendar');
     Route::get('/about', [PageController::class, 'about'])->name('about');
     Route::get('/contacts', [PageController::class, 'contacts'])->name('contacts');
     Route::get('/privacy', [PageController::class, 'text'])->defaults('slug', 'privacy')->name('privacy');
