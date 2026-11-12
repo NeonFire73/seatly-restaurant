@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Localization;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Сторінки помилок мають бути мовою адреси, а SetLocale для неіснуючого маршруту не виконується
+        $exceptions->render(function (Throwable $e, Request $request) {
+            Localization::applyFromPath($request);
+
+            return null;
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

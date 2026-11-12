@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Support\Localization;
+use Carbon\Carbon;
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class SetLocale
+{
+    /**
+     * @param  Closure(Request): Response  $next
+     */
+    public function handle(Request $request, Closure $next, string $locale): Response
+    {
+        if (Localization::isSupported($locale)) {
+            app()->setLocale($locale);
+            Carbon::setLocale($locale);
+        }
+
+        return $next($request);
+    }
+}
