@@ -9,7 +9,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
     </head>
-    <body class="min-h-screen bg-ink text-cream font-sans antialiased">
+    <body class="min-h-screen bg-surface text-ink font-sans antialiased">
         {{ $slot }}
 
         @livewireScripts
