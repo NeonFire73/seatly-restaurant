@@ -28,6 +28,13 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'monobank' => [
+        'token' => env('MONOBANK_TOKEN'),
+        'base_url' => env('MONOBANK_BASE_URL', 'https://api.monobank.ua'),
+        // Публічна адреса для вебхуків, якщо сайт працює за тунелем і APP_URL ззовні недоступний
+        'webhook_url' => env('MONOBANK_WEBHOOK_URL'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

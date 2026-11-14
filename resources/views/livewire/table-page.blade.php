@@ -1,5 +1,6 @@
 @php
     use App\Enums\OrderItemStatus;
+    use App\Services\Payments\TipSettings;
     use App\Support\Money;
 
     $table = $this->table;
@@ -92,7 +93,14 @@
                             </div>
                         </dl>
 
-                        <p class="mt-4 text-sm text-ink-soft">{{ __('table.bill.pay_hint') }}</p>
+                        @if ($order->subtotal > 0 && $order->amountDue() === 0)
+                            <p class="mt-4 flex items-center gap-2 rounded-card bg-muted p-4 text-sm font-medium">
+                                <x-site.icon name="check" class="size-5 shrink-0 text-success" />
+                                {{ __('table.bill.paid_in_full') }}
+                            </p>
+                        @else
+                            <p class="mt-4 text-sm text-ink-soft">{{ __('table.bill.pay_hint') }}</p>
+                        @endif
                     @endif
                 @endif
             </section>
@@ -145,22 +153,121 @@
             </section>
         @endif
 
-        {{-- Закріплена панель: сума до сплати й виклик офіціанта. Кнопка «Оплатити» займе це місце на етапі 6 --}}
+        {{-- Закріплена панель: сума до сплати, оплата й виклик офіціанта --}}
         <div class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
             <div class="container-site flex max-w-2xl items-center justify-between gap-3 py-3">
-                <div class="min-w-0">
-                    @if ($order !== null && $order->amountDue() > 0)
+                @if ($order !== null && $order->amountDue() > 0)
+                    <div class="min-w-0">
                         <p class="text-xs text-ink-soft">{{ __('table.bill.due') }}</p>
                         <p class="text-lg font-bold leading-tight">{{ Money::format($order->amountDue()) }}</p>
-                    @else
-                        <p class="text-sm text-ink-soft">{{ __('table.call.hint') }}</p>
-                    @endif
-                </div>
-                <x-button wire:click="callWaiter" wire:loading.attr="disabled" wire:target="callWaiter" class="shrink-0">
-                    <x-site.icon name="bell" class="size-4" />
-                    {{ __('table.call.button') }}
-                </x-button>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        {{-- Поруч із головною кнопкою виклик офіціанта стискається до значка, підпис лишається для читача екрана --}}
+                        <x-button variant="secondary" wire:click="callWaiter" wire:loading.attr="disabled" wire:target="callWaiter" class="w-11 !px-0" aria-label="{{ __('table.call.button') }}" title="{{ __('table.call.button') }}">
+                            <x-site.icon name="bell" class="size-5" />
+                        </x-button>
+                        <x-button wire:click="openPay" wire:loading.attr="disabled" wire:target="openPay">{{ __('table.pay.button') }}</x-button>
+                    </div>
+                @else
+                    <p class="min-w-0 text-sm text-ink-soft">{{ __('table.call.hint') }}</p>
+                    <x-button wire:click="callWaiter" wire:loading.attr="disabled" wire:target="callWaiter" class="shrink-0">
+                        <x-site.icon name="bell" class="size-4" />
+                        {{ __('table.call.button') }}
+                    </x-button>
+                @endif
             </div>
         </div>
+
+        @if ($paying && $order !== null)
+            @php
+                $due = $order->amountDue();
+                $tip = $this->tipAmount;
+                $tipLabel = '—';
+
+                if ($tip !== null) {
+                    $tipLabel = Money::format($tip);
+                }
+
+                $showWaiter = TipSettings::showWaiterName() && $order->waiter !== null;
+            @endphp
+
+            {{-- Панель оплати знизу (частина 1, п. 5.6). Опитування тримає суму актуальною й тоді, коли відкрито вкладку меню --}}
+            <div class="fixed inset-0 z-40 flex items-end justify-center bg-ink/50 sm:items-center" wire:poll.{{ $pollSeconds }}s x-data x-on:keydown.escape.window="$wire.closePay()">
+                <button type="button" class="absolute inset-0 cursor-default" wire:click="closePay" aria-label="{{ __('table.pay.close') }}" tabindex="-1"></button>
+
+                <section role="dialog" aria-modal="true" aria-labelledby="pay-title" class="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-card bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl sm:rounded-card">
+                    <div class="flex items-start justify-between gap-4">
+                        <h2 id="pay-title" class="text-xl font-bold">{{ __('table.pay.title') }}</h2>
+                        <button type="button" wire:click="closePay" class="-mr-2 -mt-2 inline-flex size-11 items-center justify-center rounded-full hover:bg-muted" aria-label="{{ __('table.pay.close') }}">
+                            <x-site.icon name="x" class="size-5" />
+                        </button>
+                    </div>
+
+                    <fieldset class="mt-4">
+                        <legend class="text-sm font-semibold">{{ __('table.pay.tip') }}</legend>
+                        @if ($showWaiter)
+                            <p class="mt-0.5 text-sm text-ink-soft">{{ __('table.pay.waiter', ['name' => $order->waiter->name]) }}</p>
+                        @endif
+
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach (TipSettings::percents() as $percent)
+                                <button
+                                    type="button"
+                                    wire:key="tip-{{ $percent }}"
+                                    wire:click="selectTip({{ $percent }})"
+                                    aria-pressed="{{ var_export(! $customTipMode && $tipPercent === $percent, true) }}"
+                                    class="min-h-11 min-w-14 rounded-full border border-line px-4 text-sm font-semibold transition-colors hover:bg-muted aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-on-brand"
+                                >{{ $percent }} %</button>
+                            @endforeach
+                            <button
+                                type="button"
+                                wire:click="useCustomTip"
+                                aria-pressed="{{ var_export($customTipMode, true) }}"
+                                class="min-h-11 rounded-full border border-line px-4 text-sm font-semibold transition-colors hover:bg-muted aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-on-brand"
+                            >{{ __('table.pay.custom') }}</button>
+                        </div>
+
+                        @if ($customTipMode)
+                            <div class="mt-3">
+                                <label for="custom-tip" class="text-sm font-medium">{{ __('table.pay.custom_label') }}</label>
+                                <input
+                                    id="custom-tip"
+                                    type="text"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0"
+                                    wire:model.live.debounce.400ms="customTip"
+                                    @error('customTip') aria-invalid="true" aria-describedby="custom-tip-error" @enderror
+                                    class="mt-1 block min-h-11 w-full rounded-xl border border-line bg-surface px-4 text-base aria-[invalid=true]:border-danger"
+                                >
+                                @error('customTip')
+                                    <p id="custom-tip-error" class="mt-1 text-sm text-danger">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endif
+                    </fieldset>
+
+                    <dl class="mt-5 space-y-2 border-t border-line pt-4 text-sm">
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-ink-soft">{{ __('table.pay.bill') }}</dt>
+                            <dd class="font-medium">{{ Money::format($due) }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-ink-soft">{{ __('table.pay.tip') }}</dt>
+                            <dd class="font-medium">{{ $tipLabel }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4 border-t border-line pt-2 text-base">
+                            <dt class="font-semibold">{{ __('table.pay.total') }}</dt>
+                            <dd class="font-bold">{{ Money::format($due + (int) $tip) }}</dd>
+                        </div>
+                    </dl>
+
+                    <x-button size="lg" wire:click="pay" wire:loading.attr="disabled" wire:target="pay" class="mt-5 w-full">
+                        {{ __('table.pay.proceed') }}
+                    </x-button>
+                    <p class="mt-3 text-center text-xs text-ink-soft">{{ __('table.pay.note') }}</p>
+                </section>
+            </div>
+        @endif
     @endif
 </div>

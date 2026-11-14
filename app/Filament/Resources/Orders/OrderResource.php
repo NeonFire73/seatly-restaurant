@@ -159,6 +159,24 @@ class OrderResource extends Resource
                                 TextEntry::make('status')->label('Статус')->badge(),
                             ]),
                     ]),
+                Section::make('Платежі')
+                    ->schema([
+                        RepeatableEntry::make('payments')
+                            ->hiddenLabel()
+                            ->columns(5)
+                            ->placeholder('Платежів ще не було')
+                            ->schema([
+                                TextEntry::make('created_at')->label('Створено')->dateTime('d.m.Y H:i', LocalTime::zone()),
+                                TextEntry::make('method')->label('Спосіб'),
+                                TextEntry::make('amount')
+                                    ->label('Сума')
+                                    ->formatStateUsing(fn (int $state) => Money::format($state, 'uk')),
+                                TextEntry::make('tip_amount')
+                                    ->label('Чайові')
+                                    ->formatStateUsing(fn (int $state) => Money::format($state, 'uk')),
+                                TextEntry::make('status')->label('Статус')->badge(),
+                            ]),
+                    ]),
             ]);
     }
 

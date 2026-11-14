@@ -19,7 +19,22 @@ return [
         'subtotal' => 'Total',
         'paid' => 'Already paid',
         'due' => 'Amount due',
-        'pay_hint' => 'To pay, please call your waiter.',
+        'pay_hint' => 'Pay online with the button below, or call your waiter to pay by cash or card.',
+        'paid_in_full' => 'The bill is paid. Thank you!',
+    ],
+
+    'pay' => [
+        'button' => 'Pay',
+        'title' => 'Pay the bill',
+        'close' => 'Close payment',
+        'tip' => 'Tip',
+        'waiter' => 'Your waiter is :name',
+        'custom' => 'Custom',
+        'custom_label' => 'Tip, UAH',
+        'bill' => 'Bill',
+        'total' => 'Total',
+        'proceed' => 'Continue to payment',
+        'note' => 'You will pay on the bank\'s secure page. Payments are in test mode.',
     ],
 
     'item_status' => [

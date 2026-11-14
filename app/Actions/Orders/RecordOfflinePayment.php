@@ -2,6 +2,7 @@
 
 namespace App\Actions\Orders;
 
+use App\Actions\Payments\InvalidatePendingPayments;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\DB;
  */
 class RecordOfflinePayment
 {
+    public function __construct(private InvalidatePendingPayments $invalidatePending) {}
+
     /**
      * @param  int|null  $amount  сума в копійках; без неї гасить усю суму до сплати
      */
@@ -26,7 +29,7 @@ class RecordOfflinePayment
             throw new OrderException('Онлайн-оплату гість проводить сам зі сторінки столика.');
         }
 
-        return DB::transaction(function () use ($order, $method, $by, $amount): Payment {
+        $payment = DB::transaction(function () use ($order, $method, $by, $amount): Payment {
             $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== OrderStatus::Open) {
@@ -60,5 +63,10 @@ class RecordOfflinePayment
 
             return $payment;
         });
+
+        // Гість міг відкрити платіжну сторінку й не заплатити: рахунок, що лишився чинним, оплатили б удруге
+        $this->invalidatePending->handle($order);
+
+        return $payment;
     }
 }

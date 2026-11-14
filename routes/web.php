@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\QrPrintController;
+use App\Http\Controllers\Site\FakePaymentController;
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\PageController;
+use App\Http\Controllers\Site\PaymentController;
 use App\Http\Controllers\Site\ReservationController;
 use App\Http\Controllers\Site\TableController;
+use App\Http\Controllers\Webhooks\MonobankWebhookController;
 use App\Http\Middleware\SetLocale;
 use App\Support\Localization;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +23,8 @@ $publicRoutes = function (): void {
     Route::get('/booking/{token}', [ReservationController::class, 'show'])->name('reservation.show');
     Route::get('/booking/{token}/calendar.ics', [ReservationController::class, 'calendar'])->name('reservation.calendar');
     Route::get('/t/{token}', TableController::class)->name('table.show');
+    Route::get('/pay/{payment}/return', [PaymentController::class, 'result'])->name('payment.return');
+    Route::get('/pay/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payment.receipt');
     Route::get('/about', [PageController::class, 'about'])->name('about');
     Route::get('/contacts', [PageController::class, 'contacts'])->name('contacts');
     Route::get('/privacy', [PageController::class, 'text'])->defaults('slug', 'privacy')->name('privacy');
@@ -33,6 +38,16 @@ foreach (Localization::locales() as $locale) {
         Route::prefix($locale)->name("{$locale}.")->middleware(SetLocale::class.':'.$locale)->group($publicRoutes);
     }
 }
+
+// Вебхук платіжного провайдера (частина 2, п. 6.4): без сесії, cookie та CSRF — запит надсилає банк, а не браузер
+Route::post('/webhooks/monobank', MonobankWebhookController::class)
+    ->withoutMiddleware('web')
+    ->middleware('throttle:240,1')
+    ->name('webhooks.monobank');
+
+// Підставна платіжна сторінка; відкривається лише з PAYMENT_GATEWAY=fake (частина 2, п. 6.5)
+Route::get('/fake-pay/{payment}', [FakePaymentController::class, 'show'])->name('fake-pay.show');
+Route::post('/fake-pay/{payment}', [FakePaymentController::class, 'submit'])->name('fake-pay.submit');
 
 // Друк табличок із QR-кодами — сторінка поза панеллю Filament; права перевіряє сам контролер
 Route::get('/admin/tables/qr-print', QrPrintController::class)->name('admin.tables.qr-print');

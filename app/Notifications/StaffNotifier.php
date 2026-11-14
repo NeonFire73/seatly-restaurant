@@ -4,14 +4,17 @@ namespace App\Notifications;
 
 use App\Enums\UserRole;
 use App\Models\DiningTable;
+use App\Models\Payment;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Support\LocalTime;
+use App\Support\Money;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Сповіщення персоналу в адмін-панелі (дзвіночок) про бронювання (частина 2, п. 3.7) і виклики офіціанта (п. 4.5).
+ * Сповіщення персоналу в адмін-панелі (дзвіночок) про бронювання (частина 2, п. 3.7), виклики офіціанта (п. 4.5)
+ * й онлайн-оплати.
  */
 final class StaffNotifier
 {
@@ -59,6 +62,37 @@ final class StaffNotifier
             null,
             [UserRole::Owner, UserRole::Manager, UserRole::Waiter],
         );
+    }
+
+    /**
+     * Гість сплатив рахунок онлайн (загальна частина, п. 3.3): офіціант замовлення має побачити це в панелі.
+     */
+    public static function orderPaid(Payment $payment): void
+    {
+        $order = $payment->order;
+        $body = 'Замовлення № '.$order->number;
+
+        if ($payment->tip_amount > 0) {
+            $body .= ', чайові '.Money::format($payment->tip_amount, 'uk');
+        }
+
+        $users = User::query()
+            ->where('is_active', true)
+            ->where(function (Builder $query) use ($order): void {
+                $query->whereIn('role', [UserRole::Owner, UserRole::Manager]);
+
+                if ($order->waiter_id !== null) {
+                    $query->orWhere('id', $order->waiter_id);
+                }
+            })
+            ->get();
+
+        Notification::make()
+            ->title('Столик №'.$order->table->number.': сплачено онлайн '.Money::format($payment->amount, 'uk'))
+            ->body($body)
+            ->icon('heroicon-o-credit-card')
+            ->success()
+            ->sendToDatabase($users);
     }
 
     /**
