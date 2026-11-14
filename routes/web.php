@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\QrPrintController;
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\PageController;
 use App\Http\Controllers\Site\ReservationController;
+use App\Http\Controllers\Site\TableController;
 use App\Http\Middleware\SetLocale;
 use App\Support\Localization;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +19,7 @@ $publicRoutes = function (): void {
     Route::view('/booking', 'site.booking')->name('booking');
     Route::get('/booking/{token}', [ReservationController::class, 'show'])->name('reservation.show');
     Route::get('/booking/{token}/calendar.ics', [ReservationController::class, 'calendar'])->name('reservation.calendar');
+    Route::get('/t/{token}', TableController::class)->name('table.show');
     Route::get('/about', [PageController::class, 'about'])->name('about');
     Route::get('/contacts', [PageController::class, 'contacts'])->name('contacts');
     Route::get('/privacy', [PageController::class, 'text'])->defaults('slug', 'privacy')->name('privacy');
@@ -30,6 +33,9 @@ foreach (Localization::locales() as $locale) {
         Route::prefix($locale)->name("{$locale}.")->middleware(SetLocale::class.':'.$locale)->group($publicRoutes);
     }
 }
+
+// Друк табличок із QR-кодами — сторінка поза панеллю Filament; права перевіряє сам контролер
+Route::get('/admin/tables/qr-print', QrPrintController::class)->name('admin.tables.qr-print');
 
 if (app()->isLocal()) {
     Route::view('/ui-kit', 'site.ui-kit')->middleware(SetLocale::class.':uk')->name('ui-kit');

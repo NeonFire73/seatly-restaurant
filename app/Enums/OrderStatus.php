@@ -12,6 +12,18 @@ enum OrderStatus: string implements HasColor, HasLabel
     case Closed = 'closed';
     case Cancelled = 'cancelled';
 
+    /**
+     * Дозволені переходи (частина 2, п. 4.1); закрите й скасоване замовлення більше не змінюється.
+     */
+    public function canTransitionTo(self $status): bool
+    {
+        return match ($this) {
+            self::AwaitingPayment => in_array($status, [self::Open, self::Cancelled], true),
+            self::Open => in_array($status, [self::Closed, self::Cancelled], true),
+            self::Closed, self::Cancelled => false,
+        };
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

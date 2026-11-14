@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Enums\UserRole;
+use App\Models\DiningTable;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Support\LocalTime;
@@ -10,7 +11,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Сповіщення персоналу в адмін-панелі (дзвіночок) про події з бронюваннями (частина 2, п. 3.7).
+ * Сповіщення персоналу в адмін-панелі (дзвіночок) про бронювання (частина 2, п. 3.7) і виклики офіціанта (п. 4.5).
  */
 final class StaffNotifier
 {
@@ -45,12 +46,30 @@ final class StaffNotifier
     }
 
     /**
-     * Власникам і менеджерам, крім того, хто сам виконав дію.
+     * Виклик зі сторінки столика (частина 2, п. 4.5): його мають побачити передусім офіціанти.
      */
-    private static function send(Notification $notification, ?int $exceptUserId): void
+    public static function waiterCalled(DiningTable $table): void
+    {
+        self::send(
+            Notification::make()
+                ->title('Столик №'.$table->number.' кличе офіціанта')
+                ->body($table->hall->name)
+                ->icon('heroicon-o-bell-alert')
+                ->warning(),
+            null,
+            [UserRole::Owner, UserRole::Manager, UserRole::Waiter],
+        );
+    }
+
+    /**
+     * Типово — власникам і менеджерам, крім того, хто сам виконав дію.
+     *
+     * @param  list<UserRole>  $roles
+     */
+    private static function send(Notification $notification, ?int $exceptUserId, array $roles = [UserRole::Owner, UserRole::Manager]): void
     {
         $users = User::query()
-            ->whereIn('role', [UserRole::Owner, UserRole::Manager])
+            ->whereIn('role', $roles)
             ->where('is_active', true)
             ->when($exceptUserId !== null, fn (Builder $query) => $query->whereKeyNot($exceptUserId))
             ->get();

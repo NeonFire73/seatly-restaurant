@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\DiningTables\Tables;
 
+use App\Filament\Resources\DiningTables\DiningTableActions;
 use App\Filament\Support\Translations;
 use App\Models\DiningTable;
 use App\Models\Hall;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
@@ -53,7 +55,14 @@ class DiningTablesTable
                     ->options(fn () => Translations::options(Hall::orderBy('sort'))),
             ])
             ->recordActions([
-                EditAction::make(),
+                DiningTableActions::showQr(),
+                ActionGroup::make([
+                    EditAction::make(),
+                    DiningTableActions::regenerateToken(),
+                ]),
+            ])
+            ->toolbarActions([
+                DiningTableActions::printSelected(),
             ]);
     }
 }

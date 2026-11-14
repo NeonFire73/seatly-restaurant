@@ -35,7 +35,7 @@ class ReservationActions
             ->color('primary')
             ->visible(fn (Reservation $record) => self::allowed('seat', $record, ReservationStatus::Seated))
             ->action(fn (Reservation $record) => self::run(
-                fn () => app(SeatReservation::class)->handle($record),
+                fn () => app(SeatReservation::class)->handle($record, auth()->user()),
                 'Гостей посаджено за столик №'.$record->table->number,
             ));
     }

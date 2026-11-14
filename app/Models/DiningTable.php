@@ -44,6 +44,37 @@ class DiningTable extends Model
     }
 
     /**
+     * Пошук за токеном із QR-коду; порівняння — стійке до атак за часом (частина 2, розділ 9).
+     * Вимкнений столик гостям не відкривається.
+     */
+    public static function findByQrToken(string $token): ?self
+    {
+        $table = self::where('qr_token', $token)->where('is_active', true)->first();
+
+        if ($table === null || ! hash_equals($table->qr_token, $token)) {
+            return null;
+        }
+
+        return $table;
+    }
+
+    /**
+     * Адреса, зашита у QR-код. Мовного префікса немає: сторінка сама відкриється мовою браузера гостя.
+     */
+    public function qrUrl(): string
+    {
+        return route('table.show', ['token' => $this->qr_token]);
+    }
+
+    /**
+     * На столику одночасно може бути лише одне відкрите замовлення (частина 2, п. 4.1).
+     */
+    public function openOrder(): ?Order
+    {
+        return $this->orders()->open()->latest('id')->first();
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

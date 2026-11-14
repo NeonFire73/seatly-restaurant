@@ -3,11 +3,15 @@
 namespace App\Models;
 
 use App\Enums\OrderItemStatus;
+use App\Exceptions\Orders\InvalidOrderTransition;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Translatable\HasTranslations;
 
+/**
+ * @property OrderItemStatus $status
+ */
 #[Fillable(['order_id', 'dish_id', 'name', 'price', 'quantity', 'status', 'comment', 'added_by'])]
 class OrderItem extends Model
 {
@@ -24,6 +28,18 @@ class OrderItem extends Model
         return [
             'status' => OrderItemStatus::class,
         ];
+    }
+
+    /**
+     * Єдине місце зміни статусу позиції (частина 2, п. 4.2).
+     */
+    public function transitionTo(OrderItemStatus $status): void
+    {
+        if (! $this->status->canTransitionTo($status)) {
+            throw InvalidOrderTransition::ofItem($this->status, $status);
+        }
+
+        $this->forceFill(['status' => $status])->save();
     }
 
     public function total(): int

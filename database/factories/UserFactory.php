@@ -46,6 +46,11 @@ class UserFactory extends Factory
         return $this->role(UserRole::Manager);
     }
 
+    public function waiter(): static
+    {
+        return $this->role(UserRole::Waiter);
+    }
+
     public function kitchen(): static
     {
         return $this->role(UserRole::Kitchen);

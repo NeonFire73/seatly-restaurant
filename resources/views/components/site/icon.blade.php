@@ -82,6 +82,9 @@
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7.5v5M12 16h.01" />
             @break
+        @case('bell')
+            <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" />
+            @break
         @case('filter')
             <path d="M4 6h16M7 12h10M10 18h4" />
             @break

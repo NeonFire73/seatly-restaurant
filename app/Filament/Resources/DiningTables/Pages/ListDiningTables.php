@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\DiningTables\Pages;
 
+use App\Filament\Resources\DiningTables\DiningTableActions;
 use App\Filament\Resources\DiningTables\DiningTableResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -13,6 +14,7 @@ class ListDiningTables extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            DiningTableActions::printAll(),
             CreateAction::make(),
         ];
     }
