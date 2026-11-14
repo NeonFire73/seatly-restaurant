@@ -100,6 +100,8 @@ class BookingWizard extends Component
 
     public string $notice = '';
 
+    private ?AvailabilityService $availability = null;
+
     public function mount(): void
     {
         if ($this->holdOwner === '') {
@@ -496,9 +498,11 @@ class BookingWizard extends Component
         ]);
     }
 
+    // Один екземпляр на запит: сервіс запам'ятовує години роботи, особливі дні й столики,
+    // а календар питає його про кожен день місяця
     private function availability(): AvailabilityService
     {
-        return app(AvailabilityService::class);
+        return $this->availability ??= app(AvailabilityService::class);
     }
 
     private function day(): ?CarbonImmutable

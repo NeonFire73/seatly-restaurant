@@ -27,7 +27,7 @@ final class TableHold
         $expiresAt = CarbonImmutable::now()->addMinutes(BookingSettings::hold());
 
         return Cache::lock(self::KEY.'.lock', 5)->block(3, function () use ($owner, $tableId, $startsAt, $endsAt, $expiresAt): ?CarbonImmutable {
-            $holds = array_filter($this->all(), fn (array $hold) => $hold['owner'] !== $owner);
+            $holds = array_filter($this->all(fresh: true), fn (array $hold) => $hold['owner'] !== $owner);
 
             foreach ($holds as $hold) {
                 if ($hold['table_id'] === $tableId && $this->overlaps($hold, $startsAt, $endsAt)) {
@@ -54,7 +54,7 @@ final class TableHold
     public function release(string $owner): void
     {
         Cache::lock(self::KEY.'.lock', 5)->block(3, function () use ($owner): void {
-            $this->store(array_filter($this->all(), fn (array $hold) => $hold['owner'] !== $owner));
+            $this->store(array_filter($this->all(fresh: true), fn (array $hold) => $hold['owner'] !== $owner));
         });
     }
 
@@ -89,14 +89,23 @@ final class TableHold
     }
 
     /**
+     * Перевірки для показу (isHeld викликається для кожної пари «слот × столик») читають список
+     * один раз за запит; зміна під блокуванням ($fresh) завжди бере актуальний список із кешу.
+     *
      * @return list<array{owner: string, table_id: int, starts: int, ends: int, expires: int}>
      */
-    private function all(): array
+    private function all(bool $fresh = false): array
     {
         $now = now()->getTimestamp();
 
+        if ($fresh) {
+            $stored = Cache::get(self::KEY, []);
+        } else {
+            $stored = Cache::memo()->get(self::KEY, []);
+        }
+
         return array_values(array_filter(
-            (array) Cache::get(self::KEY, []),
+            (array) $stored,
             fn (array $hold) => $hold['expires'] > $now,
         ));
     }
@@ -106,7 +115,8 @@ final class TableHold
      */
     private function store(array $holds): void
     {
-        Cache::put(self::KEY, array_values($holds), now()->addHours(2));
+        // Запис через memo() заразом скидає значення, запам'ятоване в цьому запиті
+        Cache::memo()->put(self::KEY, array_values($holds), now()->addHours(2));
     }
 
     /**

@@ -24,6 +24,9 @@ final class SiteContent
 {
     private const KEYS = ['blocks', 'gallery', 'pages', 'seo', 'settings', 'hours'];
 
+    /** @var array<string, array{rows: array<int, array<string, mixed>>, models: Collection<int, Model>}> */
+    private static array $hydrated = [];
+
     /**
      * Видимий блок або null — тоді сторінка просто не виводить цей блок.
      */
@@ -105,7 +108,7 @@ final class SiteContent
     public static function flush(): void
     {
         foreach (self::KEYS as $key) {
-            Cache::forget("site-content.{$key}");
+            Cache::memo()->forget("site-content.{$key}");
         }
     }
 
@@ -117,13 +120,24 @@ final class SiteContent
      */
     private static function models(string $key, Builder $query): Collection
     {
-        $rows = Cache::rememberForever(
+        // memo(): сховище кешу — база, а параметри бронювання читаються в циклах (сотні разів за запит),
+        // тож у межах одного запиту значення береться з пам'яті, а не окремим SQL-запитом щоразу
+        $rows = Cache::memo()->rememberForever(
             "site-content.{$key}",
             fn (): array => $query->get()->map(fn (Model $model) => $model->getAttributes())->all(),
         );
 
-        $prototype = $query->getModel();
+        // Моделі збираються з рядків один раз, доки рядки в кеші ті самі: після flush() чи в наступному
+        // запиті memo() віддає інший масив, і колекція будується заново
+        if (! isset(self::$hydrated[$key]) || self::$hydrated[$key]['rows'] !== $rows) {
+            $prototype = $query->getModel();
 
-        return collect($rows)->values()->map(fn (array $attributes) => $prototype->newFromBuilder($attributes));
+            self::$hydrated[$key] = [
+                'rows' => $rows,
+                'models' => collect($rows)->values()->map(fn (array $attributes) => $prototype->newFromBuilder($attributes)),
+            ];
+        }
+
+        return self::$hydrated[$key]['models'];
     }
 }

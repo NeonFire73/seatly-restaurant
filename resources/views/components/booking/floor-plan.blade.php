@@ -37,11 +37,13 @@
                 $textClass = 'fill-ink-soft';
 
                 if ($isSelected) {
-                    $shapeClass = 'fill-brand stroke-brand';
-                    $textClass = 'fill-on-brand';
+                    // group-switching: натиснуто інший столик — цей одразу виглядає вільним
+                    $shapeClass = 'fill-brand stroke-brand group-switching:fill-surface group-switching:stroke-ink group-focus-visible:stroke-brand-hover';
+                    $textClass = 'fill-on-brand group-switching:fill-ink';
                 } elseif ($isFree) {
-                    $shapeClass = 'fill-surface stroke-ink group-hover:fill-ink/5';
-                    $textClass = 'fill-ink';
+                    // group-data-loading: столик зафарбовується одразу після натискання, до відповіді сервера
+                    $shapeClass = 'fill-surface stroke-ink group-hover:fill-ink/5 group-data-loading:fill-brand group-data-loading:stroke-brand';
+                    $textClass = 'fill-ink group-data-loading:fill-on-brand';
                 }
             @endphp
 
@@ -52,20 +54,23 @@
                 aria-label="{{ __('booking.table.aria', ['number' => $table->number, 'seats' => trans_choice('booking.table.seats', $table->seats), 'state' => $stateLabel]) }}"
                 @if ($isFree || $isSelected)
                     tabindex="0"
+                    data-choice
                     aria-pressed="{{ json_encode($isSelected) }}"
                     wire:click="selectTable({{ $table->id }})"
                     x-on:keydown.enter.prevent="$wire.selectTable({{ $table->id }})"
                     x-on:keydown.space.prevent="$wire.selectTable({{ $table->id }})"
-                    class="group cursor-pointer"
+                    {{-- Рамка фокуса браузера на <g> — прямокутник по межах фігури, що стирчить з-під заокруглених кутів.
+                         Натомість фокус із клавіатури показує товстіший контур самої фігури (group-focus-visible нижче). --}}
+                    class="group cursor-pointer outline-none"
                 @else
                     aria-disabled="true"
                     class="cursor-not-allowed"
                 @endif
             >
                 @if ($table->shape === TableShape::Round)
-                    <ellipse cx="{{ $cx }}" cy="{{ $cy }}" rx="{{ $table->width / 2 }}" ry="{{ $table->height / 2 }}" stroke-width="3" class="{{ $shapeClass }} transition-colors duration-200" />
+                    <ellipse cx="{{ $cx }}" cy="{{ $cy }}" rx="{{ $table->width / 2 }}" ry="{{ $table->height / 2 }}" stroke-width="3" class="{{ $shapeClass }} transition-colors duration-200 group-focus-visible:[stroke-width:7]" />
                 @else
-                    <rect x="{{ $table->x }}" y="{{ $table->y }}" width="{{ $table->width }}" height="{{ $table->height }}" rx="14" stroke-width="3" class="{{ $shapeClass }} transition-colors duration-200" />
+                    <rect x="{{ $table->x }}" y="{{ $table->y }}" width="{{ $table->width }}" height="{{ $table->height }}" rx="14" stroke-width="3" class="{{ $shapeClass }} transition-colors duration-200 group-focus-visible:[stroke-width:7]" />
                 @endif
 
                 {{-- Текст не повертається разом зі столиком, щоб лишатися читабельним --}}

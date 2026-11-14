@@ -27,6 +27,13 @@
     --radius-card: 1rem;
 }
 
+/* Перемикання вибору в групі (дата, час, зал, столик): щойно натиснуто інший варіант — Livewire ставить
+   на нього data-loading, — попередній обраний одразу втрачає підсвітку, не чекаючи відповіді сервера.
+   switching — для самого варіанта, group-switching — для його вкладених елементів (фігури столика на схемі).
+   :is() навмисно, а не :where(): специфічність має перебити aria-pressed:* і hover:*. */
+@custom-variant switching (&:is([data-choice-group]:has([data-choice][data-loading]) [data-choice]:not([data-loading])));
+@custom-variant group-switching (:is([data-choice-group]:has([data-choice][data-loading]) [data-choice]:not([data-loading])) &);
+
 @layer base {
     html {
         scroll-behavior: smooth;

@@ -130,7 +130,7 @@
                                 @endforeach
                             </div>
 
-                            <div class="grid grid-cols-7 gap-1">
+                            <div class="grid grid-cols-7 gap-1" data-choice-group>
                                 @foreach ($this->calendar as $week)
                                     @foreach ($week as $day)
                                         @if ($day['inMonth'])
@@ -138,12 +138,15 @@
                                                 type="button"
                                                 wire:key="day-{{ $day['date'] }}"
                                                 wire:click="selectDate('{{ $day['date'] }}')"
+                                                data-choice
                                                 @disabled(! $day['bookable'])
                                                 aria-label="{{ LocalTime::dateLabel(LocalTime::parse($day['date'])) }}"
                                                 aria-pressed="{{ json_encode($date === $day['date']) }}"
+                                                {{-- data-loading Livewire ставить на натиснутий елемент до відповіді сервера:
+                                                     вибір підсвічується одразу, а не після запиту (так само для часу, залу й столика) --}}
                                                 @class([
-                                                    'flex aspect-square min-h-11 items-center justify-center rounded-full text-sm font-medium transition-colors duration-150',
-                                                    'bg-brand text-on-brand' => $date === $day['date'],
+                                                    'flex aspect-square min-h-11 items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 data-loading:bg-brand data-loading:text-on-brand',
+                                                    'bg-brand text-on-brand switching:bg-transparent switching:text-ink' => $date === $day['date'],
                                                     'hover:bg-muted' => $date !== $day['date'] && $day['bookable'],
                                                     'text-ink-soft/40 line-through' => ! $day['bookable'],
                                                     'ring-1 ring-ink' => $day['today'] && $date !== $day['date'],
@@ -166,18 +169,19 @@
                         @elseif ($this->timeSlots === [])
                             <p class="mt-3 text-ink-soft">{{ __('booking.when.no_slots') }}</p>
                         @else
-                            <div class="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                            <div class="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6" data-choice-group>
                                 @foreach ($this->timeSlots as $slot)
                                     <button
                                         type="button"
                                         wire:key="slot-{{ $slot['time'] }}"
                                         wire:click="selectTime('{{ $slot['time'] }}')"
+                                        data-choice
                                         @disabled(! $slot['available'])
                                         aria-pressed="{{ json_encode($time === $slot['time']) }}"
                                         @if (! $slot['available']) aria-label="{{ $slot['time'] }}, {{ __('booking.when.slot_taken') }}" @endif
                                         @class([
-                                            'min-h-11 rounded-full border text-sm font-medium tabular-nums transition-colors duration-150',
-                                            'border-brand bg-brand text-on-brand' => $time === $slot['time'],
+                                            'min-h-11 rounded-full border text-sm font-medium tabular-nums transition-colors duration-150 data-loading:border-brand data-loading:bg-brand data-loading:text-on-brand',
+                                            'border-brand bg-brand text-on-brand switching:border-line switching:bg-transparent switching:text-ink' => $time === $slot['time'],
                                             'border-line hover:border-ink' => $time !== $slot['time'] && $slot['available'],
                                             'border-line text-ink-soft/40 line-through' => ! $slot['available'],
                                         ])
@@ -218,19 +222,22 @@
                     </div>
 
                     @if ($this->halls->count() > 1)
-                        <div role="group" aria-label="{{ __('booking.table.halls') }}" class="flex flex-wrap gap-2">
+                        <div role="group" aria-label="{{ __('booking.table.halls') }}" class="flex flex-wrap gap-2" data-choice-group>
                             @foreach ($this->halls as $option)
                                 <button
                                     type="button"
                                     wire:click="selectHall({{ $option->id }})"
+                                    data-choice
                                     aria-pressed="{{ json_encode($hall && $option->id === $hall->id) }}"
-                                    class="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-medium transition-colors hover:border-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-surface"
+                                    class="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-medium transition-colors hover:border-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-surface data-loading:border-ink data-loading:bg-ink data-loading:text-surface switching:border-line switching:bg-transparent switching:text-ink"
                                 >{{ $option->name }}</button>
                             @endforeach
                         </div>
                     @endif
 
                     @if ($hall)
+                        {{-- Схема й запасний список — одна група вибору: натискання в списку одразу знімає підсвітку й на схемі --}}
+                        <div class="space-y-6" data-choice-group>
                         <x-booking.floor-plan :hall="$hall" :states="$this->tableStates" :selected="$tableId" wire:key="plan-{{ $hall->id }}" />
 
                         <ul class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink-soft" aria-label="{{ __('booking.table.legend') }}">
@@ -251,8 +258,9 @@
                                             type="button"
                                             wire:key="list-table-{{ $table->id }}"
                                             wire:click="selectTable({{ $table->id }})"
+                                            data-choice
                                             aria-pressed="{{ json_encode($tableId === $table->id) }}"
-                                            class="inline-flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium transition-colors hover:border-ink aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-on-brand"
+                                            class="inline-flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium transition-colors hover:border-ink aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-on-brand data-loading:border-brand data-loading:bg-brand data-loading:text-on-brand switching:border-line switching:bg-transparent switching:text-ink"
                                         >
                                             {{ __('booking.table.name', ['number' => $table->number]) }}
                                             <span class="font-normal opacity-80">· {{ trans_choice('booking.table.seats', $table->seats) }}</span>
@@ -261,6 +269,7 @@
                                 </div>
                             @endif
                         </section>
+                        </div>
                     @endif
 
                     <div class="flex justify-between border-t border-line pt-6">

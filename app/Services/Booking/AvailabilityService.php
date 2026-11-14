@@ -35,6 +35,9 @@ class AvailabilityService
     /** @var array<string, SpecialDay>|null */
     private ?array $specialDays = null;
 
+    /** @var Collection<int, DiningTable>|null */
+    private ?Collection $tables = null;
+
     public function __construct(private readonly TableHold $holds) {}
 
     /**
@@ -260,7 +263,7 @@ class AvailabilityService
      */
     public function bookableTables(): Collection
     {
-        return DiningTable::query()
+        return $this->tables ??= DiningTable::query()
             ->where('is_active', true)
             ->whereHas('hall', fn (Builder $query) => $query->where('is_active', true))
             ->orderBy('id')
