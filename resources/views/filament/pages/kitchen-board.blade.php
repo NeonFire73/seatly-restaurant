@@ -70,11 +70,18 @@
                 @foreach ($scheduled as $card)
                     @php
                         $item = $card['item'];
+                        $startAt = LocalTime::of($card['startAt']);
+                        // Попередні замовлення видно й на наступні дні: тоді поруч із часом стоїть дата
+                        $startDay = '';
+
+                        if (! $startAt->isSameDay(LocalTime::now())) {
+                            $startDay = $startAt->format('d.m').' ';
+                        }
                     @endphp
                     <article wire:key="scheduled-{{ $item->id }}" class="kb-card">
                         <div class="kb-meta">
                             <span>Столик №{{ $card['table'] }}</span>
-                            <span>почати о {{ LocalTime::timeLabel($card['startAt']) }}</span>
+                            <span>почати {{ $startDay }}о {{ $startAt->format('H:i') }}</span>
                         </div>
                         <p class="kb-dish">{{ $item->name }} × {{ $item->quantity }}</p>
                         @if ($item->comment)

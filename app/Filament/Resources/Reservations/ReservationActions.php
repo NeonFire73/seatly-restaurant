@@ -4,17 +4,20 @@ namespace App\Filament\Resources\Reservations;
 
 use App\Actions\Reservations\CancelReservation;
 use App\Actions\Reservations\CompleteReservation;
+use App\Actions\Reservations\ConfirmReservation;
 use App\Actions\Reservations\MarkReservationNoShow;
 use App\Actions\Reservations\MoveReservation;
 use App\Actions\Reservations\RestoreReservation;
 use App\Actions\Reservations\SeatReservation;
 use App\Enums\ReservationStatus;
-use App\Exceptions\Booking\BookingException;
 use App\Filament\Resources\Reservations\Schemas\ReservationForm;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\Booking\RefundPolicy;
 use App\Support\LocalTime;
+use App\Support\Money;
 use Closure;
+use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -27,6 +30,21 @@ use Illuminate\Support\Facades\Gate;
  */
 class ReservationActions
 {
+    public static function confirm(): Action
+    {
+        return Action::make('confirm')
+            ->label('Підтвердити без оплати')
+            ->icon(Heroicon::OutlinedCheckBadge)
+            ->color('gray')
+            ->requiresConfirmation()
+            ->modalDescription('Бронювання стане підтвердженим і безкоштовним. Неоплачене попереднє замовлення буде скасовано: без оплати кухня його не готує.')
+            ->visible(fn (Reservation $record) => $record->status === ReservationStatus::PendingPayment && Gate::allows('confirm', $record))
+            ->action(fn (Reservation $record) => self::run(
+                fn () => app(ConfirmReservation::class)->handle($record),
+                'Бронювання підтверджено',
+            ));
+    }
+
     public static function seat(): Action
     {
         return Action::make('seat')
@@ -62,7 +80,7 @@ class ReservationActions
             ->icon(Heroicon::OutlinedXCircle)
             ->color('danger')
             ->modalHeading('Скасувати бронювання?')
-            ->modalDescription('Гість отримає лист про скасування, якщо вказано e-mail.')
+            ->modalDescription(fn (Reservation $record) => self::cancelDescription($record))
             ->modalSubmitActionLabel('Скасувати бронювання')
             ->schema([
                 Textarea::make('reason')
@@ -164,19 +182,39 @@ class ReservationActions
             });
     }
 
+    /**
+     * Перед скасуванням видно, що буде з грошима гостя; рахує те саме правило, що й саме повернення.
+     */
+    public static function cancelDescription(Reservation $record): string
+    {
+        $text = 'Гість отримає лист про скасування, якщо вказано e-mail.';
+        $refund = RefundPolicy::summary($record, byStaff: true);
+
+        if ($refund['paid'] === 0) {
+            return $text;
+        }
+
+        if ($refund['refund'] === $refund['paid']) {
+            return $text.' Сплачені '.Money::format($refund['paid'], 'uk').' повернуться гостеві автоматично.';
+        }
+
+        return $text.' Зі сплачених '.Money::format($refund['paid'], 'uk').' автоматично повернеться '.Money::format($refund['refund'], 'uk')
+            .': межу безкоштовного скасування попереднього замовлення вже пройдено. Решту можна повернути вручну з картки платежу.';
+    }
+
     private static function allowed(string $ability, Reservation $record, ReservationStatus $next): bool
     {
         return $record->status->canTransitionTo($next) && Gate::allows($ability, $record);
     }
 
     /**
-     * Доменна помилка (столик зайнятий, заборонений перехід) показується сповіщенням, а не сторінкою 500.
+     * Доменна помилка (столик зайнятий, заборонений перехід, гість саме платить) показується сповіщенням, а не сторінкою 500.
      */
     private static function run(Closure $callback, string $success): void
     {
         try {
             $callback();
-        } catch (BookingException $e) {
+        } catch (DomainException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
             return;

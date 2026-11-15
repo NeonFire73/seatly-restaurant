@@ -28,7 +28,7 @@ class FakePaymentController extends Controller
             return redirect()->to($this->returnUrl($payment));
         }
 
-        return view('site.fake-pay', ['payment' => $payment->load('order.table')]);
+        return view('site.fake-pay', ['payment' => $payment->load(['order.table', 'reservation'])]);
     }
 
     public function submit(Request $request, Payment $payment, GatewayManager $gateways, FakeGateway $gateway, HandlePaymentWebhook $handleWebhook): RedirectResponse

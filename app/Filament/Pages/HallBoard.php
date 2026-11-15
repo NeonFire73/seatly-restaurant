@@ -248,7 +248,7 @@ class HallBoard extends Page
         $ids = $tables->modelKeys();
         $now = now();
 
-        $orders = Order::open()->whereIn('table_id', $ids)->with('items')->get()->keyBy('table_id');
+        $orders = Order::atTable()->whereIn('table_id', $ids)->with('items')->get()->keyBy('table_id');
         $calls = WaiterCall::where('status', WaiterCallStatus::New)->whereIn('table_id', $ids)->pluck('table_id')->flip();
         $reservations = Reservation::whereIn('table_id', $ids)
             ->whereIn('status', [ReservationStatus::Confirmed, ReservationStatus::Seated])

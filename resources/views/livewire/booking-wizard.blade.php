@@ -1,11 +1,13 @@
 @php
     use App\Services\Booking\AvailabilityService;
     use App\Support\LocalTime;
+    use App\Support\Money;
     use Illuminate\Support\Str;
 
     $stepLabels = array_map(fn (string $key) => __('booking.steps.'.$key), \App\Livewire\BookingWizard::STEPS);
     $startsAt = $this->startsAt();
     $done = $this->doneReservation;
+    $fee = $this->fee();
 @endphp
 
 {{-- Після переходу між кроками сторінка прокручується до початку майстра: кнопка «Далі» внизу, а новий крок починається вгорі --}}
@@ -86,6 +88,14 @@
             @if ($step === 1)
                 {{-- Крок 1: гості, дата, час --}}
                 <div class="space-y-8">
+                    {{-- Про плату гість дізнається одразу, а не наприкінці (частина 1, п. 5.3) --}}
+                    @if ($fee > 0)
+                        <p class="flex items-start gap-3 rounded-card bg-muted p-4 text-sm">
+                            <x-site.icon name="alert" class="size-5 shrink-0" />
+                            <span>{{ __('booking.fee.notice', ['amount' => Money::format($fee)]) }}</span>
+                        </p>
+                    @endif
+
                     <section aria-labelledby="guests-title">
                         <h2 id="guests-title" class="text-lg font-semibold">{{ __('booking.when.guests') }}</h2>
                         <div class="mt-3 flex items-center gap-4">
@@ -317,8 +327,77 @@
                         </x-button>
                     </div>
                 </form>
+            @elseif ($step === 4)
+                {{-- Крок 4: попереднє замовлення (необов'язкове) --}}
+                @php
+                    $preorderAvailable = $this->preorderAvailable();
+                @endphp
+
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-lg font-semibold">{{ __('booking.preorder.heading') }}</h2>
+                        <p class="mt-1 text-sm text-ink-soft">{{ __('booking.preorder.intro') }}</p>
+                    </div>
+
+                    @if ($preorderAvailable)
+                        <div role="group" aria-label="{{ __('booking.preorder.heading') }}" class="grid gap-3 sm:grid-cols-2" data-choice-group>
+                            <button
+                                type="button"
+                                wire:click="choosePreorder(false)"
+                                data-choice
+                                aria-pressed="{{ json_encode(! $wantsPreorder) }}"
+                                class="rounded-card border border-line p-4 text-left transition-colors hover:border-ink aria-pressed:border-brand aria-pressed:ring-1 aria-pressed:ring-brand"
+                            >
+                                <span class="block font-semibold">{{ __('booking.preorder.table_only') }}</span>
+                                <span class="mt-1 block text-sm text-ink-soft">{{ __('booking.preorder.table_only_hint') }}</span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="choosePreorder(true)"
+                                data-choice
+                                aria-pressed="{{ json_encode($wantsPreorder) }}"
+                                class="rounded-card border border-line p-4 text-left transition-colors hover:border-ink aria-pressed:border-brand aria-pressed:ring-1 aria-pressed:ring-brand"
+                            >
+                                <span class="block font-semibold">{{ __('booking.preorder.with_dishes') }}</span>
+                                <span class="mt-1 block text-sm text-ink-soft">{{ __('booking.preorder.with_dishes_hint', ['time' => $time]) }}</span>
+                            </button>
+                        </div>
+
+                        @if ($wantsPreorder)
+                            <x-booking.preorder-menu :categories="$this->preorderMenu" :cart="$cart" />
+
+                            {{-- Підсумок кошика тримається внизу екрана: меню довге, а сума має бути перед очима --}}
+                            <div class="sticky bottom-3 flex items-center justify-between gap-4 rounded-card bg-surface p-4 shadow-lg ring-1 ring-line" aria-live="polite">
+                                <p class="text-sm text-ink-soft">{{ trans_choice('booking.preorder.count', $this->cartCount()) }}</p>
+                                <p class="text-lg font-bold">{{ Money::format($this->cartTotal()) }}</p>
+                            </div>
+
+                            <p class="text-sm text-ink-soft">{{ __('booking.preorder.terms', ['hours' => $preorderCancelLabel]) }}</p>
+                        @endif
+                    @else
+                        <p class="rounded-card bg-muted p-4 text-sm text-ink-soft">{{ __('booking.preorder.unavailable', ['hours' => $preorderLeadLabel]) }}</p>
+                    @endif
+
+                    <div class="flex justify-between border-t border-line pt-6">
+                        <x-button variant="secondary" size="lg" wire:click="back">{{ __('booking.actions.back') }}</x-button>
+                        <x-button size="lg" wire:click="toSummary" wire:loading.attr="disabled">
+                            {{ __('booking.actions.next') }}
+                            <x-site.icon name="arrow-right" class="size-5" />
+                        </x-button>
+                    </div>
+                </div>
             @else
-                {{-- Крок 4: підтвердження --}}
+                {{-- Крок 5: підтвердження --}}
+                @php
+                    $lines = [];
+
+                    if ($wantsPreorder) {
+                        $lines = $this->cartLines;
+                    }
+
+                    $total = $this->totalToPay();
+                @endphp
+
                 <div class="space-y-6">
                     <h2 class="text-lg font-semibold">{{ __('booking.summary.heading') }}</h2>
 
@@ -347,14 +426,70 @@
                             </div>
                             <x-button variant="text" wire:click="goTo(3)">{{ __('booking.actions.change') }}</x-button>
                         </div>
+                        <div class="flex items-start justify-between gap-4 p-4">
+                            <div class="min-w-0 flex-1">
+                                <dt class="text-sm text-ink-soft">{{ __('booking.preorder.title') }}</dt>
+                                @if ($lines === [])
+                                    <dd class="font-medium">{{ __('booking.preorder.none') }}</dd>
+                                @else
+                                    <dd>
+                                        <ul class="mt-1 space-y-1">
+                                            @foreach ($lines as $line)
+                                                <li class="flex justify-between gap-4 text-sm">
+                                                    <span class="min-w-0 break-words font-medium">{{ $line['dish']->name }} × {{ $line['quantity'] }}</span>
+                                                    <span class="shrink-0 tabular-nums">{{ Money::format($line['total']) }}</span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </dd>
+                                @endif
+                            </div>
+                            <x-button variant="text" wire:click="goTo(4)">{{ __('booking.actions.change') }}</x-button>
+                        </div>
                     </dl>
 
-                    <p class="text-sm text-ink-soft">{{ __('booking.summary.free') }}</p>
+                    @if ($total > 0)
+                        {{-- «Бронювання + Страви = Разом» (частина 1, п. 5.3) --}}
+                        <dl class="space-y-2 rounded-card bg-muted p-4 text-sm">
+                            @if ($fee > 0)
+                                <div class="flex justify-between gap-4">
+                                    <dt>{{ __('booking.fee.label') }}</dt>
+                                    <dd class="font-medium tabular-nums">{{ Money::format($fee) }}</dd>
+                                </div>
+                            @endif
+                            @if ($lines !== [])
+                                <div class="flex justify-between gap-4">
+                                    <dt>{{ __('booking.preorder.dishes') }}</dt>
+                                    <dd class="font-medium tabular-nums">{{ Money::format($this->cartTotal()) }}</dd>
+                                </div>
+                            @endif
+                            <div class="flex justify-between gap-4 border-t border-line pt-2 text-base">
+                                <dt class="font-semibold">{{ __('booking.summary.total') }}</dt>
+                                <dd class="font-bold tabular-nums">{{ Money::format($total) }}</dd>
+                            </div>
+                        </dl>
 
-                    <div class="flex justify-between border-t border-line pt-6">
+                        <div class="space-y-1 text-sm text-ink-soft">
+                            <p>{{ __('booking.summary.pay_online', ['minutes' => \App\Services\Booking\BookingSettings::paymentHold()]) }}</p>
+                            @if ($fee > 0)
+                                <p>{{ __('booking.fee.terms', ['hours' => $feeRefundLabel]) }}</p>
+                            @endif
+                            @if ($lines !== [])
+                                <p>{{ __('booking.preorder.terms', ['hours' => $preorderCancelLabel]) }}</p>
+                            @endif
+                        </div>
+                    @else
+                        <p class="text-sm text-ink-soft">{{ __('booking.summary.free') }}</p>
+                    @endif
+
+                    <div class="flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:justify-between">
                         <x-button variant="secondary" size="lg" wire:click="back">{{ __('booking.actions.back') }}</x-button>
                         <x-button size="lg" wire:click="submit" wire:loading.attr="disabled" wire:target="submit">
-                            <span wire:loading.remove wire:target="submit">{{ __('booking.actions.book') }}</span>
+                            @if ($total > 0)
+                                <span wire:loading.remove wire:target="submit">{{ __('booking.actions.book_and_pay') }}</span>
+                            @else
+                                <span wire:loading.remove wire:target="submit">{{ __('booking.actions.book') }}</span>
+                            @endif
                             <span wire:loading wire:target="submit">{{ __('booking.actions.booking') }}</span>
                         </x-button>
                     </div>

@@ -68,6 +68,17 @@ class Order extends Model
     }
 
     /**
+     * Замовлення, які зараз обслуговуються за столиками. Оплачене попереднє замовлення теж відкрите,
+     * але столик не займає, доки гостей не посадили (частина 2, п. 4.4).
+     *
+     * @param  Builder<Order>  $query
+     */
+    public function scopeAtTable(Builder $query): void
+    {
+        $query->where('status', OrderStatus::Open)->where('type', OrderType::DineIn);
+    }
+
+    /**
      * Єдине місце зміни статусу: заборонений перехід кидає виняток (частина 2, п. 4.1).
      *
      * @param  array<string, mixed>  $attributes
@@ -100,7 +111,12 @@ class Order extends Model
      */
     public function recalculatePaidTotal(): void
     {
-        $paid = (int) $this->payments()->where('status', PaymentStatus::Success)->sum('amount');
+        $paid = 0;
+
+        // Не SQL-сумою: із частково поверненого платежу в сплаченому лишається тільки неповернена частина
+        foreach ($this->payments()->where('status', PaymentStatus::Success)->get() as $payment) {
+            $paid += $payment->amount - $payment->refundedOrderAmount();
+        }
 
         $this->forceFill(['paid_total' => $paid])->save();
     }

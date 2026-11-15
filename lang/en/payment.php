@@ -6,6 +6,8 @@ return [
     'invoice' => [
         'destination' => 'Payment for order no. :number, table :table',
         'bill_part' => 'Payment for order no. :number',
+        'reservation' => 'Payment for booking :code',
+        'booking_fee' => 'Booking fee',
         'tip' => 'Tip',
         'unit' => 'pcs',
     ],
@@ -19,6 +21,9 @@ return [
         'in_progress' => 'Someone is paying this bill right now. Wait a minute and refresh the page.',
         'gateway' => 'We could not open the payment. Try again or call your waiter.',
         'too_many' => 'Too many attempts. Please wait a minute.',
+        'reservation_closed' => 'This booking can no longer be paid.',
+        'reservation_expired' => 'The time to pay has run out and the table has been released. Please book again.',
+        'gateway_reservation' => 'We could not open the payment. Please try again in a minute.',
     ],
 
     'result' => [
@@ -37,6 +42,8 @@ return [
         'refunded_text' => 'The payment was cancelled; the money will return to your card within a few days.',
         'retry' => 'Try again',
         'back' => 'Back to the bill',
+        'success_text_reservation' => 'Your booking is confirmed. The details have been sent to your e-mail. See you soon!',
+        'back_reservation' => 'Booking page',
         'receipt' => 'Download receipt',
         'bill' => 'Bill',
         'tip' => 'Tip',
@@ -49,6 +56,7 @@ return [
         'order' => 'Order no. :number',
         'table' => 'Table :number',
         'paid_at' => 'Paid',
+        'reservation' => 'Booking',
         'payment' => 'Payment',
         'items' => 'Order items',
         'bill_paid' => 'Paid towards the bill',

@@ -40,7 +40,7 @@ class PaymentResult extends Component
     #[Computed]
     public function payment(): ?Payment
     {
-        return Payment::with('order.table')->find($this->paymentId);
+        return Payment::with(['order.table', 'reservation'])->find($this->paymentId);
     }
 
     /**

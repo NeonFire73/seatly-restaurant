@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Reservations\Tables;
 use App\Enums\ReservationSource;
 use App\Enums\ReservationStatus;
 use App\Filament\Resources\Reservations\ReservationActions;
+use App\Filament\Resources\Reservations\Schemas\ReservationInfolist;
 use App\Filament\Support\Translations;
 use App\Models\Hall;
 use App\Models\Reservation;
@@ -24,7 +25,7 @@ class ReservationsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('table.hall'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['table.hall', 'payments', 'preorder']))
             ->defaultSort('starts_at')
             ->columns([
                 TextColumn::make('starts_at')
@@ -59,9 +60,16 @@ class ReservationsTable
                             return '—';
                         }
 
-                        return Money::format($state);
+                        return Money::format($state, 'uk');
                     })
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->description(fn (Reservation $record) => ReservationInfolist::feeStateLabel($record))
+                    ->toggleable(),
+                TextColumn::make('preorder.subtotal')
+                    ->label('Попереднє замовлення')
+                    ->formatStateUsing(fn (int $state) => Money::format($state, 'uk'))
+                    ->description(fn (Reservation $record) => $record->preorder?->status->getLabel())
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('source')
                     ->label('Джерело')
                     ->color('gray')
@@ -120,6 +128,7 @@ class ReservationsTable
                 ReservationActions::seat(),
                 ViewAction::make(),
                 ActionGroup::make([
+                    ReservationActions::confirm(),
                     ReservationActions::complete(),
                     ReservationActions::move(),
                     ReservationActions::editGuest(),

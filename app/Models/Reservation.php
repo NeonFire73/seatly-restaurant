@@ -2,7 +2,8 @@
 
 namespace App\Models;
 
-use App\Enums\OrderType;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\ReservationSource;
 use App\Enums\ReservationStatus;
 use App\Exceptions\Booking\InvalidTransition;
@@ -25,6 +26,7 @@ use Illuminate\Support\Str;
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $seated_at
  * @property CarbonImmutable|null $cancelled_at
+ * @property int $fee_amount
  */
 #[Fillable([
     'code', 'token', 'table_id', 'guest_name', 'guest_phone', 'guest_email', 'guests_count',
@@ -143,12 +145,63 @@ class Reservation extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function minutesUntilStart(): int
+    {
+        return (int) now()->diffInMinutes($this->starts_at, false);
+    }
+
     /**
+     * Стан плати за бронювання для сторінки гостя й адмінки (частина 2, п. 7.4):
+     * paid, refunded, pending, unpaid; null — бронювання безкоштовне.
+     */
+    public function feeState(): ?string
+    {
+        if ($this->fee_amount === 0) {
+            return null;
+        }
+
+        $payment = $this->payments
+            ->filter(fn (Payment $payment) => $payment->booking_fee_amount > 0
+                && in_array($payment->status, [PaymentStatus::Success, PaymentStatus::Refunded], true))
+            ->sortByDesc('id')
+            ->first();
+
+        if ($payment !== null) {
+            if ($payment->refundedFee() >= $payment->booking_fee_amount) {
+                return 'refunded';
+            }
+
+            return 'paid';
+        }
+
+        if ($this->status === ReservationStatus::PendingPayment) {
+            return 'pending';
+        }
+
+        return 'unpaid';
+    }
+
+    /**
+     * Попереднє замовлення бронювання (частина 2, п. 4.4). Після посадки воно стає звичайним замовленням
+     * столика, але час подачі (serve_at) лишається — за ним воно й упізнається.
+     *
      * @return HasOne<Order, $this>
      */
     public function preorder(): HasOne
     {
-        return $this->hasOne(Order::class)->where('type', OrderType::Preorder);
+        // Умови — всередині ofMany: інакше «останнє» обиралося б серед усіх замовлень бронювання
+        return $this->hasOne(Order::class)->ofMany(
+            ['id' => 'max'],
+            fn (Builder $query) => $query->whereNotNull('serve_at')->where('status', '!=', OrderStatus::Cancelled),
+        );
+    }
+
+    /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     /**

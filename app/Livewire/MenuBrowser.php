@@ -17,7 +17,8 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Меню сайту (частина 1, п. 5.2). Режим «кошик» для попереднього замовлення додається на етапі 7.
+ * Меню сайту (частина 1, п. 5.2). Кошик попереднього замовлення — окремо: трейт HasPreorderCart
+ * і компонент x-booking.preorder-menu в майстрі бронювання.
  */
 class MenuBrowser extends Component
 {

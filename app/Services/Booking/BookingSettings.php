@@ -60,4 +60,36 @@ final class BookingSettings
     {
         return self::get('max_guests');
     }
+
+    public static function paymentHold(): int
+    {
+        return max(1, self::get('payment_hold'));
+    }
+
+    public static function preorderMinLead(): int
+    {
+        return self::get('preorder_min_lead');
+    }
+
+    public static function preorderFreeCancel(): int
+    {
+        return self::get('preorder_free_cancel');
+    }
+
+    public static function feeRefundUntil(): int
+    {
+        return self::get('fee_refund_until');
+    }
+
+    /**
+     * Плата за нове бронювання із сайту в копійках; 0 — бронювання безкоштовне (частина 2, п. 3.6).
+     */
+    public static function fee(): int
+    {
+        if (self::get('fee_enabled') === 0) {
+            return 0;
+        }
+
+        return max(0, self::get('fee_amount'));
+    }
 }

@@ -2,11 +2,16 @@
 
 namespace App\Livewire;
 
+use App\Actions\Payments\StartReservationPayment;
 use App\Actions\Reservations\CreateReservation;
 use App\Actions\Reservations\ReservationData;
 use App\Enums\ReservationSource;
+use App\Enums\ReservationStatus;
 use App\Exceptions\Booking\SlotUnavailable;
 use App\Exceptions\Booking\TableUnavailable;
+use App\Exceptions\Orders\OrderException;
+use App\Exceptions\Payments\PaymentException;
+use App\Livewire\Concerns\HasPreorderCart;
 use App\Livewire\Concerns\KeepsPageLocale;
 use App\Models\DiningTable;
 use App\Models\Hall;
@@ -28,8 +33,8 @@ use Livewire\Attributes\Session;
 use Livewire\Component;
 
 /**
- * Майстер бронювання (частина 1, п. 5.3): дата й час → столик → контакти → підтвердження.
- * Крок попереднього замовлення й оплата додаються на етапі 7.
+ * Майстер бронювання (частина 1, п. 5.3): дата й час → столик → контакти → попереднє замовлення → підтвердження.
+ * Якщо є що оплачувати (плата за бронювання чи страви), після підтвердження гість іде на платіжну сторінку.
  *
  * Стан зберігається в сесії (#[Session]), тому переживає оновлення сторінки.
  * Жодному значенню з браузера не довіряємо: кожен крок перевіряє його на сервері ще раз.
@@ -43,9 +48,9 @@ use Livewire\Component;
  */
 class BookingWizard extends Component
 {
-    use KeepsPageLocale;
+    use HasPreorderCart, KeepsPageLocale;
 
-    public const STEPS = ['when', 'table', 'contacts', 'confirm'];
+    public const STEPS = ['when', 'table', 'contacts', 'preorder', 'confirm'];
 
     #[Session]
     public int $step = 1;
@@ -83,6 +88,13 @@ class BookingWizard extends Component
 
     #[Session]
     public bool $consent = false;
+
+    #[Session]
+    public bool $wantsPreorder = false;
+
+    /** @var array<int, int> кошик попереднього замовлення: ідентифікатор страви => кількість */
+    #[Session]
+    public array $cart = [];
 
     // Випадковий ідентифікатор гостя для утримання столика; з браузера його змінити не можна
     #[Locked]
@@ -248,6 +260,29 @@ class BookingWizard extends Component
         $this->step = 4;
     }
 
+    public function choosePreorder(bool $wants): void
+    {
+        $this->notice = '';
+        $this->wantsPreorder = $wants && $this->preorderAvailable();
+    }
+
+    public function toSummary(): void
+    {
+        $this->notice = '';
+
+        if (! $this->preorderAvailable()) {
+            $this->wantsPreorder = false;
+        }
+
+        if ($this->wantsPreorder && $this->cartLines === []) {
+            $this->notice = __('booking.preorder.errors.empty');
+
+            return;
+        }
+
+        $this->step = 5;
+    }
+
     public function back(): void
     {
         $this->notice = '';
@@ -279,7 +314,7 @@ class BookingWizard extends Component
         $this->notice = __('booking.table.hold_expired');
     }
 
-    public function submit(CreateReservation $createReservation): void
+    public function submit(CreateReservation $createReservation, StartReservationPayment $startPayment): void
     {
         $this->notice = '';
         $limiterKey = 'booking:'.request()->ip();
@@ -306,6 +341,22 @@ class BookingWizard extends Component
             $comment = null;
         }
 
+        $preorderItems = [];
+
+        if ($this->wantsPreorder) {
+            $preorderItems = $this->cartItems();
+
+            // Страву зняли з меню, поки гість перевіряв дані: мовчки бронювати без неї не можна
+            if (count($preorderItems) !== count($this->cart)) {
+                $this->cart = $preorderItems;
+                unset($this->cartLines);
+                $this->step = 4;
+                $this->notice = __('booking.preorder.errors.dish_unavailable');
+
+                return;
+            }
+        }
+
         try {
             $reservation = $createReservation->handle(new ReservationData(
                 tableId: $this->tableId,
@@ -318,6 +369,7 @@ class BookingWizard extends Component
                 locale: app()->getLocale(),
                 source: ReservationSource::Site,
                 holdOwner: $this->holdOwner,
+                preorderItems: $preorderItems,
             ));
         } catch (TableUnavailable $e) {
             // Столик встигли зайняти: гість повертається до вибору столика, контакти збережено
@@ -333,12 +385,34 @@ class BookingWizard extends Component
             $this->notice = $e->getMessage();
 
             return;
+        } catch (OrderException $e) {
+            // Попереднє замовлення не склалося (страву зняли з меню, до візиту лишилося замало часу):
+            // бронювання не створено, гість повертається до кошика
+            unset($this->preorderMenu, $this->cartLines);
+            $this->step = 4;
+            $this->notice = $e->getMessage();
+
+            return;
         }
 
         RateLimiter::hit($limiterKey, 600);
 
-        $this->reset('step', 'guests', 'date', 'time', 'hallId', 'tableId', 'name', 'phone', 'email', 'comment', 'consent', 'holdExpiresAt');
-        $this->doneToken = $reservation->token;
+        $this->reset('step', 'guests', 'date', 'time', 'hallId', 'tableId', 'name', 'phone', 'email', 'comment', 'consent', 'holdExpiresAt', 'wantsPreorder', 'cart');
+
+        if ($reservation->status !== ReservationStatus::PendingPayment) {
+            $this->doneToken = $reservation->token;
+
+            return;
+        }
+
+        // Є що оплачувати: екран успіху гість побачить після оплати, на сторінці результату
+        try {
+            $payment = $startPayment->handle($reservation, app()->getLocale());
+            $this->redirect((string) $payment->page_url);
+        } catch (PaymentException) {
+            // Бронювання створене й тримає столик: оплату можна почати ще раз зі сторінки бронювання
+            $this->redirect(locale_route('reservation.show', ['token' => $reservation->token]));
+        }
     }
 
     public function startOver(): void
@@ -458,6 +532,40 @@ class BookingWizard extends Component
         return LocalTime::parse($this->date, $this->time);
     }
 
+    /**
+     * Плата за бронювання в копійках; 0 — бронювання безкоштовне (частина 2, п. 3.6).
+     */
+    public function fee(): int
+    {
+        return BookingSettings::fee();
+    }
+
+    /**
+     * Попереднє замовлення приймається не пізніше ніж за заданий час до візиту (частина 2, п. 3.1).
+     */
+    public function preorderAvailable(): bool
+    {
+        $start = $this->startsAt();
+
+        return $start !== null
+            && now()->diffInMinutes($start, false) >= BookingSettings::preorderMinLead()
+            && $this->preorderMenu->isNotEmpty();
+    }
+
+    /**
+     * Скільки гість заплатить одразу: плата за бронювання плюс страви.
+     */
+    public function totalToPay(): int
+    {
+        $total = $this->fee();
+
+        if ($this->wantsPreorder) {
+            $total += $this->cartTotal();
+        }
+
+        return $total;
+    }
+
     public function maxGuests(): int
     {
         return $this->availability()->maxGuests();
@@ -494,8 +602,19 @@ class BookingWizard extends Component
     public function render(): View
     {
         return view('livewire.booking-wizard', [
-            'durationLabel' => CarbonInterval::minutes(BookingSettings::duration())->cascade()->locale(app()->getLocale())->forHumans(),
+            'durationLabel' => self::humanMinutes(BookingSettings::duration()),
+            'feeRefundLabel' => self::humanMinutes(BookingSettings::feeRefundUntil()),
+            'preorderLeadLabel' => self::humanMinutes(BookingSettings::preorderMinLead()),
+            'preorderCancelLabel' => self::humanMinutes(BookingSettings::preorderFreeCancel()),
         ]);
+    }
+
+    /**
+     * 360 → «6 годин», 90 → «1 година 30 хвилин» мовою сторінки.
+     */
+    public static function humanMinutes(int $minutes): string
+    {
+        return CarbonInterval::minutes($minutes)->cascade()->locale(app()->getLocale())->forHumans();
     }
 
     // Один екземпляр на запит: сервіс запам'ятовує години роботи, особливі дні й столики,
@@ -622,6 +741,13 @@ class BookingWizard extends Component
 
         if ($this->step === 2 && $this->hallId === null) {
             $this->hallId = $this->defaultHallId();
+        }
+
+        // Кошик із сесії міг застаріти: лишаються тільки страви, які ще є в меню
+        $this->cart = $this->cartItems();
+
+        if (! $this->preorderAvailable()) {
+            $this->wantsPreorder = false;
         }
     }
 

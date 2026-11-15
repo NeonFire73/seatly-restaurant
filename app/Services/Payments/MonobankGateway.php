@@ -40,7 +40,7 @@ class MonobankGateway implements PaymentGateway
 
     public function createInvoice(Payment $payment): InvoiceData
     {
-        $payment->loadMissing(['order.table', 'order.items']);
+        $payment->loadMissing(['order.table', 'order.items', 'reservation']);
         $locale = $payment->locale() ?? Localization::main();
         $validity = (int) config('seatly.payments.validity');
 
@@ -53,10 +53,7 @@ class MonobankGateway implements PaymentGateway
             'ccy' => self::UAH,
             'merchantPaymInfo' => [
                 'reference' => $payment->id,
-                'destination' => trans('payment.invoice.destination', [
-                    'number' => $payment->order->number,
-                    'table' => $payment->order->table->number,
-                ], $locale),
+                'destination' => $this->destination($payment, $locale),
                 'basketOrder' => $this->basket($payment, $locale),
             ],
             'redirectUrl' => Localization::route('payment.return', ['payment' => $payment->id], $locale),
@@ -165,6 +162,18 @@ class MonobankGateway implements PaymentGateway
         return new PaymentStatusData($invoiceId, $status, $modifiedAt, $failureReason, $refunded);
     }
 
+    private function destination(Payment $payment, string $locale): string
+    {
+        if ($payment->reservation !== null) {
+            return trans('payment.invoice.reservation', ['code' => $payment->reservation->code], $locale);
+        }
+
+        return trans('payment.invoice.destination', [
+            'number' => $payment->order?->number,
+            'table' => $payment->order?->table->number,
+        ], $locale);
+    }
+
     private function webhookUrl(): string
     {
         $configured = (string) config('services.monobank.webhook_url');
@@ -197,12 +206,19 @@ class MonobankGateway implements PaymentGateway
      */
     private function basket(Payment $payment, string $locale): array
     {
-        $items = $payment->order->items->filter(fn (OrderItem $item) => $item->status !== OrderItemStatus::Cancelled);
-        $itemsTotal = (int) $items->sum(fn (OrderItem $item) => $item->total());
         $unit = trans('payment.invoice.unit', [], $locale);
         $basket = [];
+        $items = collect();
 
-        if ($itemsTotal === $payment->amount) {
+        if ($payment->order !== null) {
+            $items = $payment->order->items->filter(fn (OrderItem $item) => $item->status !== OrderItemStatus::Cancelled);
+        }
+
+        $itemsTotal = (int) $items->sum(fn (OrderItem $item) => $item->total());
+
+        if ($payment->amount === 0) {
+            // Платіж лише за бронювання: страв у кошику немає
+        } elseif ($itemsTotal === $payment->amount) {
             foreach ($items as $item) {
                 $basket[] = [
                     'name' => $item->getTranslation('name', $locale),
@@ -215,12 +231,23 @@ class MonobankGateway implements PaymentGateway
             }
         } else {
             $basket[] = [
-                'name' => trans('payment.invoice.bill_part', ['number' => $payment->order->number], $locale),
+                'name' => trans('payment.invoice.bill_part', ['number' => $payment->order?->number], $locale),
                 'qty' => 1,
                 'sum' => $payment->amount,
                 'total' => $payment->amount,
                 'unit' => $unit,
                 'code' => 'order-'.$payment->order_id,
+            ];
+        }
+
+        if ($payment->booking_fee_amount > 0) {
+            $basket[] = [
+                'name' => trans('payment.invoice.booking_fee', [], $locale),
+                'qty' => 1,
+                'sum' => $payment->booking_fee_amount,
+                'total' => $payment->booking_fee_amount,
+                'unit' => $unit,
+                'code' => 'booking-fee',
             ];
         }
 

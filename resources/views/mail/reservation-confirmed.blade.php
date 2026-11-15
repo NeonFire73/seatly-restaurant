@@ -1,5 +1,6 @@
 @php
     use App\Support\LocalTime;
+    use App\Support\Money;
 @endphp
 
 <x-mail::message>
@@ -16,6 +17,20 @@
 **{{ __('booking.summary.table') }}:** №{{ $reservation->table->number }}, {{ $reservation->table->hall->name }}<br>
 **{{ __('booking.summary.guests') }}:** {{ $reservation->guests_count }}
 </x-mail::panel>
+
+@if ($payment)
+<x-mail::panel>
+@if ($payment->booking_fee_amount > 0)
+**{{ __('booking.fee.label') }}:** {{ Money::format($payment->booking_fee_amount) }}<br>
+@endif
+@if ($payment->amount > 0)
+**{{ __('booking.preorder.title') }}:** {{ Money::format($payment->amount) }}<br>
+@endif
+**{{ __('booking.mail.paid.total') }}:** {{ Money::format($payment->total()) }}
+
+[{{ __('booking.mail.paid.receipt') }}]({{ $receiptUrl }})
+</x-mail::panel>
+@endif
 
 <x-mail::button :url="$url">
 {{ __('booking.mail.confirmed.button') }}

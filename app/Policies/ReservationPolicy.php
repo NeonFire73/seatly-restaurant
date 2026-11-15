@@ -34,6 +34,14 @@ class ReservationPolicy
         return $user->isManagement();
     }
 
+    /**
+     * Підтвердити неоплачене бронювання без оплати.
+     */
+    public function confirm(User $user, Reservation $reservation): bool
+    {
+        return $user->isManagement();
+    }
+
     public function seat(User $user, Reservation $reservation): bool
     {
         return $this->worksInHall($user);

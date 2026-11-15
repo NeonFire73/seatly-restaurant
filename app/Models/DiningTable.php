@@ -68,10 +68,11 @@ class DiningTable extends Model
 
     /**
      * На столику одночасно може бути лише одне відкрите замовлення (частина 2, п. 4.1).
+     * Попереднє замовлення на майбутній візит сюди не входить.
      */
     public function openOrder(): ?Order
     {
-        return $this->orders()->open()->latest('id')->first();
+        return $this->orders()->atTable()->latest('id')->first();
     }
 
     /**

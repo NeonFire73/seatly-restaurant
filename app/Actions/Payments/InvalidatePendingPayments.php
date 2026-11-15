@@ -6,12 +6,13 @@ use App\Enums\PaymentStatus;
 use App\Exceptions\Payments\GatewayException;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\Reservation;
 use App\Services\Payments\GatewayManager;
 use App\Services\Payments\PaymentStatusData;
 
 /**
- * Робить недійсними неоплачені онлайн-рахунки замовлення: коли гість починає оплату з іншою сумою,
- * коли рахунок сплатили готівкою чи замовлення скасували. Інакше той самий рахунок могли б сплатити двічі.
+ * Робить недійсними неоплачені онлайн-рахунки замовлення чи бронювання: коли гість починає оплату з іншою сумою,
+ * коли рахунок сплатили готівкою, замовлення чи бронювання скасували. Інакше той самий рахунок могли б сплатити двічі.
  */
 class InvalidatePendingPayments
 {
@@ -24,11 +25,11 @@ class InvalidatePendingPayments
     /**
      * @return bool false — принаймні один рахунок скасувати не вдалося (найімовірніше, його саме оплачують)
      */
-    public function handle(Order $order): bool
+    public function handle(Order|Reservation $owner): bool
     {
         $allInvalidated = true;
 
-        foreach ($order->payments()->pendingOnline()->get() as $payment) {
+        foreach ($owner->payments()->pendingOnline()->get() as $payment) {
             if (! $this->invalidate($payment)) {
                 $allInvalidated = false;
             }

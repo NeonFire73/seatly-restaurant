@@ -15,6 +15,7 @@ class ViewReservation extends ViewRecord
     {
         return [
             ReservationActions::seat(),
+            ReservationActions::confirm(),
             ReservationActions::complete(),
             ReservationActions::move(),
             ActionGroup::make([

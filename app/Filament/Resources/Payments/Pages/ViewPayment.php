@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Support\Money;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -49,30 +50,37 @@ class ViewPayment extends ViewRecord
                 ->icon(Heroicon::OutlinedArrowUturnLeft)
                 ->color('danger')
                 ->modalHeading('Повернути кошти?')
-                ->modalDescription(fn (Payment $record) => 'Гостеві повернеться '.Money::format($record->total(), 'uk')
-                    .' разом із чайовими, а сума знову стане до сплати за замовленням. Скасувати повернення не можна.')
+                ->modalDescription(fn (Payment $record) => self::refundDescription($record))
                 ->modalSubmitActionLabel('Повернути кошти')
-                ->schema([
+                ->schema(fn (Payment $record) => [
+                    // Вибір є лише там, де в платежі дві частини й жодної ще не повернено повністю
+                    Select::make('part')
+                        ->label('Що повернути')
+                        ->options(self::refundParts($record))
+                        ->default(RefundPayment::ALL)
+                        ->selectablePlaceholder(false)
+                        ->required()
+                        ->visible(count(self::refundParts($record)) > 1),
                     Textarea::make('reason')
                         ->label('Причина')
                         ->required()
                         ->maxLength(255)
                         ->rows(2),
                 ])
-                ->visible(fn (Payment $record) => $record->status === PaymentStatus::Success && Gate::allows('refund', $record))
+                ->visible(fn (Payment $record) => $record->refundable() > 0 && Gate::allows('refund', $record))
                 ->action(function (Payment $record, array $data): void {
                     /** @var User $user */
                     $user = auth()->user();
 
                     try {
-                        app(RefundPayment::class)->handle($record, $user, $data['reason']);
+                        app(RefundPayment::class)->handle($record, $user, $data['reason'], $data['part'] ?? RefundPayment::ALL);
                     } catch (PaymentException $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
 
                         return;
                     }
 
-                    if ($record->status === PaymentStatus::Refunded) {
+                    if ($record->status === PaymentStatus::Refunded || $record->refunded_amount > 0) {
                         Notification::make()->title('Кошти повернено')->success()->send();
 
                         return;
@@ -85,5 +93,34 @@ class ViewPayment extends ViewRecord
                         ->send();
                 }),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function refundParts(Payment $payment): array
+    {
+        $fee = $payment->booking_fee_amount - $payment->refundedFee();
+        $order = $payment->amount - $payment->refundedOrderAmount();
+
+        if ($fee === 0 || $order === 0) {
+            return [RefundPayment::ALL => 'Усе, що лишилося: '.Money::format($payment->refundable(), 'uk')];
+        }
+
+        return [
+            RefundPayment::ALL => 'Усе: '.Money::format($payment->refundable(), 'uk'),
+            RefundPayment::FEE => 'Лише плату за бронювання: '.Money::format($fee, 'uk'),
+            RefundPayment::ORDER => 'Лише суму страв: '.Money::format($order, 'uk'),
+        ];
+    }
+
+    private static function refundDescription(Payment $payment): string
+    {
+        if ($payment->reservation_id !== null) {
+            return 'Гостеві можна повернути до '.Money::format($payment->refundable(), 'uk').'. Скасувати повернення не можна.';
+        }
+
+        return 'Гостеві повернеться '.Money::format($payment->refundable(), 'uk')
+            .' разом із чайовими, а сума знову стане до сплати за замовленням. Скасувати повернення не можна.';
     }
 }

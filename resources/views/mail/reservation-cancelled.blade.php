@@ -1,5 +1,6 @@
 @php
     use App\Support\LocalTime;
+    use App\Support\Money;
 @endphp
 
 <x-mail::message>
@@ -13,6 +14,10 @@
     'time' => LocalTime::timeLabel($reservation->starts_at),
 ]) }}
 
+@if ($refunded > 0)
+{{ __('booking.mail.cancelled.refund', ['amount' => Money::format($refunded)]) }}
+
+@endif
 <x-mail::button :url="$bookingUrl">
 {{ __('booking.mail.cancelled.button') }}
 </x-mail::button>

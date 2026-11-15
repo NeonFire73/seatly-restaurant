@@ -41,6 +41,7 @@ class FakeGateway implements PaymentGateway
                 PaymentStatus::from($state['status']),
                 CarbonImmutable::parse($state['at']),
                 $state['reason'] ?? null,
+                (int) ($state['refunded'] ?? 0),
             );
         }
 
@@ -55,7 +56,7 @@ class FakeGateway implements PaymentGateway
             $modifiedAt = CarbonImmutable::instance($payment->provider_modified_at);
         }
 
-        return new PaymentStatusData($invoiceId, $payment->status, $modifiedAt);
+        return new PaymentStatusData($invoiceId, $payment->status, $modifiedAt, null, $payment->refunded_amount);
     }
 
     public function invalidate(Payment $payment): void
@@ -69,7 +70,16 @@ class FakeGateway implements PaymentGateway
 
     public function refund(Payment $payment, ?int $amount = null): void
     {
-        $this->simulate($payment, PaymentStatus::Refunded);
+        $refunded = $this->getStatus($payment)->refundedAmount + ($amount ?? $payment->total());
+
+        if ($refunded >= $payment->total()) {
+            $this->simulate($payment, PaymentStatus::Refunded);
+
+            return;
+        }
+
+        // Часткове повернення: як і в Monobank, платіж лишається успішним, росте лише повернена сума
+        $this->simulate($payment, PaymentStatus::Success, $refunded);
     }
 
     public function parseWebhook(Request $request): PaymentStatusData
@@ -88,7 +98,7 @@ class FakeGateway implements PaymentGateway
      * Те, що на справжньому шлюзі робить гість на сторінці банку: змінює стан рахунку «в провайдера».
      * Результат має пройти через той самий обробник, що й вебхук.
      */
-    public function simulate(Payment $payment, PaymentStatus $status): PaymentStatusData
+    public function simulate(Payment $payment, PaymentStatus $status, int $refunded = 0): PaymentStatusData
     {
         $invoiceId = (string) $payment->provider_invoice_id;
         $at = CarbonImmutable::now();
@@ -99,9 +109,9 @@ class FakeGateway implements PaymentGateway
         }
 
         // Масив, а не об'єкт: кеш Laravel 13 об'єктів не розсеріалізовує
-        Cache::put($this->cacheKey($invoiceId), ['status' => $status->value, 'at' => $at->toIso8601String(), 'reason' => $reason], now()->addDay());
+        Cache::put($this->cacheKey($invoiceId), ['status' => $status->value, 'at' => $at->toIso8601String(), 'reason' => $reason, 'refunded' => $refunded], now()->addDay());
 
-        return new PaymentStatusData($invoiceId, $status, $at, $reason);
+        return new PaymentStatusData($invoiceId, $status, $at, $reason, $refunded);
     }
 
     private function cacheKey(string $invoiceId): string

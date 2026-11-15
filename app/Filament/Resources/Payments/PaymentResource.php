@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\Payments\Pages\ListPayments;
 use App\Filament\Resources\Payments\Pages\ViewPayment;
+use App\Filament\Resources\Reservations\ReservationResource;
 use App\Models\Payment;
 use App\Models\PaymentWebhookLog;
 use App\Support\LocalTime;
@@ -55,7 +56,7 @@ class PaymentResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['order.table', 'waiter']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['order.table', 'reservation', 'waiter']))
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('created_at')
@@ -65,14 +66,27 @@ class PaymentResource extends Resource
                 TextColumn::make('order.number')
                     ->label('Замовлення')
                     ->fontFamily('mono')
+                    ->placeholder('—')
                     ->searchable(),
+                TextColumn::make('reservation.code')
+                    ->label('Бронювання')
+                    ->fontFamily('mono')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('order.table.number')
                     ->label('Столик')
+                    ->placeholder('—')
                     ->prefix('№'),
                 TextColumn::make('amount')
                     ->label('Сума')
                     ->formatStateUsing(fn (int $state) => Money::format($state, 'uk'))
                     ->alignEnd(),
+                TextColumn::make('booking_fee_amount')
+                    ->label('Плата за бронювання')
+                    ->formatStateUsing(fn (int $state) => Money::format($state, 'uk'))
+                    ->alignEnd()
+                    ->toggleable(),
                 TextColumn::make('tip_amount')
                     ->label('Чайові')
                     ->formatStateUsing(fn (int $state) => Money::format($state, 'uk'))
@@ -122,8 +136,17 @@ class PaymentResource extends Resource
                             ->label('Разом')
                             ->state(fn (Payment $record) => Money::format($record->total(), 'uk'))
                             ->weight('bold'),
-                        TextEntry::make('order.number')->label('Замовлення')->fontFamily('mono'),
-                        TextEntry::make('order.table.number')->label('Столик')->prefix('№'),
+                        TextEntry::make('booking_fee_amount')
+                            ->label('Плата за бронювання')
+                            ->formatStateUsing(fn (int $state) => Money::format($state, 'uk'))
+                            ->visible(fn (Payment $record) => $record->booking_fee_amount > 0),
+                        TextEntry::make('reservation.code')
+                            ->label('Бронювання')
+                            ->fontFamily('mono')
+                            ->url(fn (Payment $record) => ReservationResource::getUrl('view', ['record' => $record->reservation]))
+                            ->visible(fn (Payment $record) => $record->reservation_id !== null),
+                        TextEntry::make('order.number')->label('Замовлення')->fontFamily('mono')->placeholder('немає'),
+                        TextEntry::make('order.table.number')->label('Столик')->prefix('№')->placeholder('—'),
                         TextEntry::make('waiter.name')->label('Отримувач чайових')->placeholder('не призначено'),
                         TextEntry::make('created_at')->label('Створено')->dateTime('d.m.Y H:i:s', LocalTime::zone()),
                         TextEntry::make('paid_at')->label('Сплачено')->dateTime('d.m.Y H:i:s', LocalTime::zone())->placeholder('не сплачено'),
@@ -139,6 +162,10 @@ class PaymentResource extends Resource
                         TextEntry::make('refunded_amount')
                             ->label('Повернено')
                             ->formatStateUsing(fn (int $state) => Money::format($state, 'uk')),
+                        TextEntry::make('refund_parts')
+                            ->label('З чого')
+                            ->state(fn (Payment $record) => self::refundPartsLabel($record))
+                            ->visible(fn (Payment $record) => $record->booking_fee_amount > 0 && $record->amount > 0),
                         TextEntry::make('refunded_at')->label('Коли')->dateTime('d.m.Y H:i', LocalTime::zone())->placeholder('ще обробляється'),
                         TextEntry::make('meta.refund.by_name')->label('Хто повернув')->placeholder('автоматично'),
                         TextEntry::make('meta.refund.reason')->label('Причина')->placeholder('не вказано')->columnSpanFull(),
@@ -170,6 +197,15 @@ class PaymentResource extends Resource
                             ]),
                     ]),
             ]);
+    }
+
+    /**
+     * У платежі за бронювання плата й сума страв повертаються окремо (частина 2, п. 3.6).
+     */
+    public static function refundPartsLabel(Payment $payment): string
+    {
+        return 'плата за бронювання — '.Money::format($payment->refundedFee(), 'uk')
+            .', страви — '.Money::format($payment->refundedOrderAmount(), 'uk');
     }
 
     public static function signatureLabel(PaymentWebhookLog $log): string

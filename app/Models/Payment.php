@@ -14,13 +14,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
- * @property int $order_id
+ * @property int|null $order_id
+ * @property int|null $reservation_id
  * @property PaymentMethod $method
  * @property PaymentStatus $status
  * @property string|null $provider
  * @property string|null $provider_invoice_id
  * @property int $amount
  * @property int $tip_amount
+ * @property int $booking_fee_amount
  * @property int $refunded_amount
  * @property int|null $waiter_id
  * @property string|null $page_url
@@ -33,7 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $created_at
  */
 #[Fillable([
-    'order_id', 'method', 'provider', 'provider_invoice_id', 'amount', 'tip_amount', 'currency',
+    'order_id', 'reservation_id', 'method', 'provider', 'provider_invoice_id', 'amount', 'tip_amount', 'booking_fee_amount', 'currency',
     'status', 'waiter_id', 'page_url', 'expires_at', 'paid_at', 'refunded_at', 'refunded_amount',
     'provider_modified_at', 'failure_reason', 'meta', 'recorded_by',
 ])]
@@ -69,11 +71,55 @@ class Payment extends Model
     }
 
     /**
-     * Скільки гість платить насправді: частина рахунку плюс чайові.
+     * Скільки гість платить насправді: частина рахунку, чайові й плата за бронювання.
      */
     public function total(): int
     {
-        return $this->amount + $this->tip_amount;
+        return $this->amount + $this->tip_amount + $this->booking_fee_amount;
+    }
+
+    /**
+     * Скільки ще можна повернути.
+     */
+    public function refundable(): int
+    {
+        if ($this->status !== PaymentStatus::Success) {
+            return 0;
+        }
+
+        return max(0, $this->total() - $this->refunded_amount);
+    }
+
+    /**
+     * Часткове повернення (частина 2, п. 3.6): плата за бронювання й сума страв повертаються кожна
+     * за своїм правилом, тож платіж пам'ятає, скільки повернено з кожної частини.
+     */
+    public function refundedFee(): int
+    {
+        if ($this->status === PaymentStatus::Refunded) {
+            return $this->booking_fee_amount;
+        }
+
+        return min($this->booking_fee_amount, (int) ($this->meta['refund_parts']['fee'] ?? 0));
+    }
+
+    public function refundedOrderAmount(): int
+    {
+        if ($this->status === PaymentStatus::Refunded) {
+            return $this->amount;
+        }
+
+        return min($this->amount, (int) ($this->meta['refund_parts']['order'] ?? 0));
+    }
+
+    public function rememberRefundedParts(int $fee, int $order): void
+    {
+        $meta = $this->meta ?? [];
+        $meta['refund_parts'] = [
+            'fee' => $this->refundedFee() + $fee,
+            'order' => $this->refundedOrderAmount() + $order,
+        ];
+        $this->meta = $meta;
     }
 
     public function isOnline(): bool
@@ -112,6 +158,14 @@ class Payment extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * @return BelongsTo<Reservation, $this>
+     */
+    public function reservation(): BelongsTo
+    {
+        return $this->belongsTo(Reservation::class);
     }
 
     /**

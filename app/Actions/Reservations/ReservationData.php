@@ -23,5 +23,7 @@ final readonly class ReservationData
         public ?int $createdBy = null,
         // Ідентифікатор утримання столика з майстра: власне утримання не заважає бронюванню
         public ?string $holdOwner = null,
+        /** @var array<int, int> попереднє замовлення: ідентифікатор страви => кількість */
+        public array $preorderItems = [],
     ) {}
 }

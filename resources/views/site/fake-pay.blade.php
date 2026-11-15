@@ -10,7 +10,11 @@
             <h1 class="mt-3 text-2xl font-bold tracking-tight">{{ __('payment.fake.title') }}</h1>
             <p class="mt-2 text-sm text-ink-soft">{{ __('payment.fake.text') }}</p>
 
-            <p class="mt-6 text-sm text-ink-soft">{{ __('payment.invoice.destination', ['number' => $payment->order->number, 'table' => $payment->order->table->number]) }}</p>
+            @if ($payment->reservation)
+                <p class="mt-6 text-sm text-ink-soft">{{ __('payment.invoice.reservation', ['code' => $payment->reservation->code]) }}</p>
+            @else
+                <p class="mt-6 text-sm text-ink-soft">{{ __('payment.invoice.destination', ['number' => $payment->order->number, 'table' => $payment->order->table->number]) }}</p>
+            @endif
             <p class="mt-1 flex items-baseline justify-between gap-4">
                 <span class="text-sm font-semibold">{{ __('payment.fake.amount') }}</span>
                 <span class="text-3xl font-bold">{{ Money::format($payment->total()) }}</span>

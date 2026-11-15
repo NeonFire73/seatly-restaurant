@@ -15,7 +15,10 @@ class ReservationCancelledMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public Reservation $reservation) {}
+    /**
+     * @param  int  $refunded  скільки повернено гостеві, у копійках
+     */
+    public function __construct(public Reservation $reservation, public int $refunded = 0) {}
 
     public function envelope(): Envelope
     {

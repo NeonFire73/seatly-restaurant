@@ -44,7 +44,10 @@ it('проводить гостя від дати до екрана успіху
         ->call('review')
         ->assertHasNoErrors()
         ->assertSet('step', 4)
+        ->call('toSummary')
+        ->assertSet('step', 5)
         ->assertSee('Оксана Гриценко')
+        ->assertSee(__('booking.summary.free'))
         ->call('submit')
         ->assertSee(__('booking.done.title'));
 
@@ -175,7 +178,7 @@ it('перевіряє контакти й згоду з умовами', functi
 });
 
 it('повертає на крок столика зі збереженими даними, якщо столик встигли зайняти', function () {
-    $component = ($this->fillContacts)(($this->atContacts)())->call('review')->assertSet('step', 4);
+    $component = ($this->fillContacts)(($this->atContacts)())->call('review')->call('toSummary')->assertSet('step', 5);
 
     // Поки гість перевіряв дані, менеджер забронював цей столик телефоном
     Reservation::factory()->for($this->table, 'table')->at(kyiv('2026-11-17 18:00'))->create();
@@ -225,7 +228,7 @@ it('обмежує частоту бронювань з однієї адрес�
             ->call('autoSelect')
             ->call('enterContacts');
 
-        return ($this->fillContacts)($component)->call('review')->call('submit');
+        return ($this->fillContacts)($component)->call('review')->call('toSummary')->call('submit');
     };
 
     foreach (range(1, 5) as $i) {
@@ -242,7 +245,7 @@ it('бронює англійською й запам\'ятовує мову д�
     $component = ($this->atContacts)();
     app()->setLocale('uk');
 
-    ($this->fillContacts)($component)->call('review')->call('submit')->assertSee('Your table is booked');
+    ($this->fillContacts)($component)->call('review')->call('toSummary')->call('submit')->assertSee('Your table is booked');
 
     expect(Reservation::sole()->locale)->toBe('en');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\Payment;
 use App\Models\Reservation;
 use App\Support\Ics;
 use App\Support\Localization;
@@ -20,7 +21,10 @@ class ReservationConfirmedMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public Reservation $reservation) {}
+    /**
+     * @param  Payment|null  $payment  оплата, яка підтвердила бронювання: тоді лист містить і квитанцію (частина 2, п. 3.7)
+     */
+    public function __construct(public Reservation $reservation, public ?Payment $payment = null) {}
 
     public function envelope(): Envelope
     {
@@ -31,7 +35,17 @@ class ReservationConfirmedMail extends Mailable implements ShouldQueue
     {
         return new Content(markdown: 'mail.reservation-confirmed', with: [
             'url' => Localization::route('reservation.show', ['token' => $this->reservation->token], $this->reservation->locale),
+            'receiptUrl' => $this->receiptUrl(),
         ]);
+    }
+
+    private function receiptUrl(): ?string
+    {
+        if ($this->payment === null) {
+            return null;
+        }
+
+        return Localization::route('payment.receipt', ['payment' => $this->payment->id], $this->reservation->locale);
     }
 
     /**

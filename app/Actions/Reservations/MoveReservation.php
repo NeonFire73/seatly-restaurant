@@ -43,6 +43,12 @@ class MoveReservation
                 'ends_at' => $this->availability->endsAt($start)->utc(),
             ]);
 
+            // Попереднє замовлення переїжджає разом із бронюванням: інший столик, інший час подачі
+            $reservation->preorder()->first()?->update([
+                'table_id' => $table->id,
+                'serve_at' => $start->utc(),
+            ]);
+
             return $reservation;
         });
     }

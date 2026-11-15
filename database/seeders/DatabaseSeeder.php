@@ -19,6 +19,8 @@ class DatabaseSeeder extends Seeder
             ContentSeeder::class,
             // Після залів і годин роботи: бронювання ставляться на столики в робочі дні
             ReservationSeeder::class,
+            // Після меню й бронювань: оплачені попередні замовлення до найближчих візитів
+            PreorderSeeder::class,
             OrderSeeder::class,
             OrderHistorySeeder::class,
         ]);

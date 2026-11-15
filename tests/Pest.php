@@ -1,5 +1,12 @@
 <?php
 
+use App\Actions\Payments\HandlePaymentWebhook;
+use App\Actions\Payments\StartReservationPayment;
+use App\Enums\PaymentStatus;
+use App\Models\Payment;
+use App\Models\Reservation;
+use App\Models\Setting;
+use App\Services\Payments\PaymentStatusData;
 use Carbon\CarbonImmutable;
 use Database\Seeders\WorkingHourSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,4 +29,27 @@ function openRestaurant(): void
 function kyiv(string $moment): CarbonImmutable
 {
     return CarbonImmutable::parse($moment, 'Europe/Kyiv');
+}
+
+/**
+ * Власник увімкнув платне бронювання (частина 2, п. 3.6); сума — у копійках.
+ */
+function enableBookingFee(int $kopecks = 20000): void
+{
+    Setting::put('booking', ['fee_enabled' => true, 'fee_amount' => $kopecks]);
+}
+
+/**
+ * Те, що зробив би вебхук провайдера після дій гостя на платіжній сторінці.
+ */
+function settle(Payment $payment, PaymentStatus $status = PaymentStatus::Success): Payment
+{
+    app(HandlePaymentWebhook::class)->handle(new PaymentStatusData((string) $payment->provider_invoice_id, $status, CarbonImmutable::now()));
+
+    return $payment->refresh();
+}
+
+function payReservation(Reservation $reservation): Payment
+{
+    return settle(app(StartReservationPayment::class)->handle($reservation));
 }

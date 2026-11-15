@@ -96,6 +96,52 @@ final class StaffNotifier
     }
 
     /**
+     * Гість сплатив бронювання: плату за нього, попереднє замовлення або обидва (частина 2, п. 3.7).
+     */
+    public static function reservationPaid(Payment $payment): void
+    {
+        $reservation = $payment->reservation;
+
+        if ($reservation === null) {
+            return;
+        }
+
+        $parts = [];
+
+        if ($payment->booking_fee_amount > 0) {
+            $parts[] = 'плата за бронювання '.Money::format($payment->booking_fee_amount, 'uk');
+        }
+
+        if ($payment->amount > 0) {
+            $parts[] = 'попереднє замовлення '.Money::format($payment->amount, 'uk');
+        }
+
+        self::send(
+            Notification::make()
+                ->title('Бронювання '.$reservation->code.': сплачено онлайн '.Money::format($payment->total(), 'uk'))
+                ->body(ucfirst(implode(', ', $parts)).'. '.self::summary($reservation))
+                ->icon('heroicon-o-credit-card')
+                ->success(),
+            null,
+        );
+    }
+
+    /**
+     * Автоматичне повернення не вдалося: гроші має повернути людина з картки платежу.
+     */
+    public static function refundFailed(Payment $payment): void
+    {
+        self::send(
+            Notification::make()
+                ->title('Не вдалося автоматично повернути '.Money::format($payment->refundable(), 'uk'))
+                ->body('Платіж '.$payment->id.'. Поверніть кошти вручну в розділі «Платежі».')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->danger(),
+            null,
+        );
+    }
+
+    /**
      * Типово — власникам і менеджерам, крім того, хто сам виконав дію.
      *
      * @param  list<UserRole>  $roles

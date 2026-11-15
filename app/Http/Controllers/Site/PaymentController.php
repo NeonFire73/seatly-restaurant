@@ -25,7 +25,7 @@ class PaymentController extends Controller
     {
         abort_unless($payment->isOnline() && $payment->status === PaymentStatus::Success, 404);
 
-        $payment->load(['order.table', 'order.items' => function (HasMany $relation): void {
+        $payment->load(['reservation', 'order.table', 'order.items' => function (HasMany $relation): void {
             $relation->getQuery()->where('status', '!=', OrderItemStatus::Cancelled)->orderBy('id');
         }]);
 
