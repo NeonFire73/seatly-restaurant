@@ -5,6 +5,8 @@
     'description' => null,
     // Сторінки з персональними даними (бронювання гостя) закриті від індексації
     'noindex' => false,
+    // Мікророзмітка schema.org для сторінки: масив, який піде в JSON-LD
+    'schema' => null,
 ])
 
 @php
@@ -48,6 +50,10 @@
         <meta property="og:locale" content="{{ app()->getLocale() === 'uk' ? 'uk_UA' : 'en_US' }}">
         @if ($ogImage)
             <meta property="og:image" content="{{ $ogImage }}">
+        @endif
+
+        @if ($schema)
+            <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) !!}</script>
         @endif
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])

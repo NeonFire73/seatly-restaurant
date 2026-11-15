@@ -15,6 +15,7 @@ use App\Exceptions\Booking\SlotUnavailable;
 use App\Exceptions\Booking\TableUnavailable;
 use App\Mail\ReservationCancelledMail;
 use App\Mail\ReservationConfirmedMail;
+use App\Mail\ReservationReminderMail;
 use App\Models\DiningTable;
 use App\Models\Reservation;
 use App\Models\User;
@@ -230,4 +231,35 @@ it('фонова задача позначає неявку через пів г
     expect($late->fresh()->status)->toBe(ReservationStatus::NoShow)
         ->and($soon->fresh()->status)->toBe(ReservationStatus::Confirmed)
         ->and($seated->fresh()->status)->toBe(ReservationStatus::Seated);
+});
+
+it('фонова задача надсилає нагадування за три години до візиту лише раз', function () {
+    $soon = Reservation::factory()->for($this->table, 'table')->at(kyiv('2026-11-16 18:00'))->create(['locale' => 'en']);
+    $later = Reservation::factory()->at(kyiv('2026-11-16 20:00'))->create();
+    $cancelled = Reservation::factory()->at(kyiv('2026-11-16 18:00'))->status(ReservationStatus::Cancelled)->create();
+    $noEmail = Reservation::factory()->at(kyiv('2026-11-16 18:00'))->create(['guest_email' => null]);
+
+    $this->travelTo(kyiv('2026-11-16 15:10'));
+    // Забронював за дві години до візиту: підтвердження щойно отримав, нагадування зайве
+    $lastMinute = Reservation::factory()->at(kyiv('2026-11-16 17:30'))->create();
+
+    $this->artisan('reservations:send-reminders')->expectsOutputToContain('Надіслано нагадувань: 1')->assertSuccessful();
+    $this->artisan('reservations:send-reminders')->assertSuccessful();
+
+    Mail::assertQueued(ReservationReminderMail::class, 1);
+    Mail::assertQueued(ReservationReminderMail::class, fn (ReservationReminderMail $mail) => $mail->reservation->is($soon)
+        && $mail->locale === 'en'
+        && $mail->hasTo($soon->guest_email));
+
+    expect($soon->fresh()->reminded_at)->not->toBeNull()
+        ->and($later->fresh()->reminded_at)->toBeNull()
+        ->and($cancelled->fresh()->reminded_at)->toBeNull()
+        ->and($noEmail->fresh()->reminded_at)->toBeNull()
+        ->and($lastMinute->fresh()->reminded_at)->not->toBeNull();
+
+    app()->setLocale('en');
+    (new ReservationReminderMail($soon))
+        ->assertSeeInHtml($soon->code)
+        ->assertSeeInHtml('/en/booking/'.$soon->token)
+        ->assertSeeInHtml('See you today');
 });

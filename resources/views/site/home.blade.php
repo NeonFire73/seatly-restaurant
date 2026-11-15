@@ -13,7 +13,7 @@
     $contacts = SiteContent::contacts();
 @endphp
 
-<x-layouts::app seo="home">
+<x-layouts::app seo="home" :schema="\App\Support\StructuredData::restaurant()">
     {{-- 1. Перший екран --}}
     @if ($hero)
         <section class="relative overflow-hidden">

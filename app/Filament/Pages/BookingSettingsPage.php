@@ -4,10 +4,12 @@ namespace App\Filament\Pages;
 
 use App\Models\Setting;
 use App\Services\Booking\BookingSettings;
+use App\Services\Payments\TipSettings;
 use App\Services\SiteContent;
 use App\Support\Money;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -21,8 +23,9 @@ use InvalidArgumentException;
 use UnitEnum;
 
 /**
- * Сторінка «Налаштування» (частина 2, пп. 3.6 і 7.9): платне бронювання й правила попереднього замовлення.
- * Значення лежать у settings під ключем `booking` і перекривають типові з config/seatly.php.
+ * Сторінка «Налаштування» (частина 2, пп. 3.6 і 7.9): параметри бронювання, платне бронювання,
+ * правила попереднього замовлення й чайові. Значення лежать у settings під ключами `booking` і `tips`
+ * та перекривають типові з config/seatly.php. Години роботи — окрема сторінка WorkingHoursPage.
  *
  * @property-read Schema $form
  */
@@ -39,6 +42,19 @@ class BookingSettingsPage extends Page
     protected static ?int $navigationSort = 6;
 
     protected static ?string $title = 'Налаштування';
+
+    // Параметри бронювання з п. 3.1: ключ => [підпис, одиниця, найменше, найбільше]
+    private const BOOKING_FIELDS = [
+        'duration' => ['Тривалість бронювання', 'хв', 30, 480],
+        'slot_step' => ['Крок слотів', 'хв', 5, 120],
+        'buffer' => ['Перерва між бронюваннями одного столика', 'хв', 0, 120],
+        'min_lead' => ['Бронювати не пізніше ніж за', 'хв до візиту', 0, 1440],
+        'horizon_days' => ['Бронювати наперед не далі ніж на', 'днів', 1, 365],
+        'last_slot_before_close' => ['Останній слот перед закриттям — за', 'хв', 0, 480],
+        'hold' => ['Утримувати обраний столик у майстрі бронювання', 'хв', 1, 60],
+        'no_show_after' => ['Позначати «не прийшов» після початку через', 'хв', 5, 240],
+        'max_guests' => ['Найбільша компанія для онлайн-бронювання', 'гостей', 1, 50],
+    ];
 
     /** @var array<string, mixed> */
     public array $data = [];
@@ -57,6 +73,11 @@ class BookingSettingsPage extends Page
             'payment_hold' => BookingSettings::paymentHold(),
             'preorder_min_lead_hours' => self::toHours(BookingSettings::preorderMinLead()),
             'preorder_free_cancel_hours' => self::toHours(BookingSettings::preorderFreeCancel()),
+            ...self::bookingState(),
+            'tip_percents' => array_map(strval(...), TipSettings::percents()),
+            'tip_default_percent' => TipSettings::defaultPercent(),
+            'tip_max_percent' => TipSettings::maxPercent(),
+            'tip_show_waiter_name' => TipSettings::showWaiterName(),
         ]);
     }
 
@@ -66,6 +87,11 @@ class BookingSettingsPage extends Page
             ->statePath('data')
             ->columns(2)
             ->components([
+                Section::make('Параметри бронювання')
+                    ->description('Діють на нові бронювання; уже створені не змінюються.')
+                    ->columnSpanFull()
+                    ->columns(3)
+                    ->schema(self::bookingFields()),
                 Section::make('Платне бронювання')
                     ->description('Плата за сам факт бронювання на сайті. У рахунок за страви не зараховується; бронювання, створені в адмінці, безкоштовні.')
                     ->columnSpan(1)
@@ -112,6 +138,35 @@ class BookingSettingsPage extends Page
                             ->minValue(5)
                             ->maxValue(120),
                     ]),
+                Section::make('Чайові')
+                    ->description('Що бачить гість, коли оплачує рахунок за QR-кодом столика.')
+                    ->columnSpanFull()
+                    ->columns(3)
+                    ->schema([
+                        TagsInput::make('tip_percents')
+                            ->label('Варіанти у відсотках')
+                            ->helperText('Наприклад: 0, 5, 10, 15. Після кожного числа натисніть Enter.')
+                            ->placeholder('Додати відсоток')
+                            ->required()
+                            ->nestedRecursiveRules(['integer', 'min:0', 'max:100'])
+                            ->columnSpanFull(),
+                        TextInput::make('tip_default_percent')
+                            ->label('Вибрано одразу')
+                            ->suffix('%')
+                            ->integer()
+                            ->required()
+                            ->rule(fn (Get $get) => self::defaultTipRule((array) $get('tip_percents'))),
+                        TextInput::make('tip_max_percent')
+                            ->label('Найбільші чайові «своєю сумою»')
+                            ->suffix('% від суми платежу')
+                            ->integer()
+                            ->required()
+                            ->minValue(1)
+                            ->maxValue(100),
+                        Toggle::make('tip_show_waiter_name')
+                            ->label('Показувати гостеві ім\'я офіціанта')
+                            ->inline(false),
+                    ]),
             ]);
     }
 
@@ -142,8 +197,26 @@ class BookingSettingsPage extends Page
             $fee = Money::toKopecks($state['fee_amount']);
         }
 
+        $general = [];
+
+        foreach (array_keys(self::BOOKING_FIELDS) as $key) {
+            $general[$key] = (int) $state[$key];
+        }
+
+        $percents = array_values(array_unique(array_map(intval(...), $state['tip_percents'])));
+        sort($percents);
+
+        Setting::put('tips', [
+            ...(array) SiteContent::setting('tips', []),
+            'percents' => $percents,
+            'default_percent' => (int) $state['tip_default_percent'],
+            'max_percent' => (int) $state['tip_max_percent'],
+            'show_waiter_name' => (bool) $state['tip_show_waiter_name'],
+        ]);
+
         Setting::put('booking', [
             ...(array) SiteContent::setting('booking', []),
+            ...$general,
             'fee_enabled' => $enabled,
             'fee_amount' => $fee,
             'fee_refund_until' => self::toMinutes($state['fee_refund_hours']),
@@ -156,6 +229,54 @@ class BookingSettingsPage extends Page
             ->title('Налаштування збережено')
             ->success()
             ->send();
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function bookingState(): array
+    {
+        $state = [];
+
+        foreach (array_keys(self::BOOKING_FIELDS) as $key) {
+            $state[$key] = BookingSettings::get($key);
+        }
+
+        return $state;
+    }
+
+    /**
+     * @return list<TextInput>
+     */
+    private static function bookingFields(): array
+    {
+        $fields = [];
+
+        foreach (self::BOOKING_FIELDS as $key => [$label, $suffix, $min, $max]) {
+            $fields[] = TextInput::make($key)
+                ->label($label)
+                ->suffix($suffix)
+                ->integer()
+                ->required()
+                ->minValue($min)
+                ->maxValue($max);
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Типовий відсоток має бути серед варіантів: інакше гість побачив би вибраною кнопку, якої немає.
+     *
+     * @param  array<int|string, mixed>  $percents
+     */
+    private static function defaultTipRule(array $percents): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($percents): void {
+            if (! in_array((int) $value, array_map(intval(...), $percents), true)) {
+                $fail('Оберіть один із варіантів, перелічених вище.');
+            }
+        };
     }
 
     private function confirmationText(): string

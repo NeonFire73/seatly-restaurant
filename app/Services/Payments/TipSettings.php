@@ -43,9 +43,14 @@ final class TipSettings
         return intdiv($base * $percent + 50, 100);
     }
 
+    public static function maxPercent(): int
+    {
+        return max(0, (int) self::get('max_percent'));
+    }
+
     public static function maxFor(int $base): int
     {
-        return self::amountFor($base, max(0, (int) self::get('max_percent')));
+        return self::amountFor($base, self::maxPercent());
     }
 
     private static function get(string $key): mixed

@@ -36,6 +36,10 @@ return [
         'socials' => 'Follow us',
     ],
 
+    'schema' => [
+        'cuisine' => 'Ukrainian and European cuisine',
+    ],
+
     'menu' => [
         'title' => 'Menu',
         'categories' => 'Categories',

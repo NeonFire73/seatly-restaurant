@@ -90,3 +90,60 @@ it('закінчує заголовок вкладки однією назвою
     'оферта' => ['/offer', 200],
     'сторінка помилки' => ['/en/nope', 404],
 ]);
+
+// ---------- Пошукова оптимізація (частина 1, п. 7.4) ----------
+
+it('додає на головну мікророзмітку ресторану з контактами й годинами роботи', function () {
+    $html = $this->get('/en')->assertOk()->getContent();
+
+    preg_match('#<script type="application/ld\+json">(.+?)</script>#s', $html, $match);
+    $data = json_decode($match[1], true, flags: JSON_THROW_ON_ERROR);
+
+    expect($data['@type'])->toBe('Restaurant')
+        ->and($data['url'])->toEndWith('/en')
+        ->and($data['hasMenu'])->toEndWith('/en/menu')
+        ->and($data['openingHoursSpecification'])->toHaveCount(7)
+        ->and($data['openingHoursSpecification'][0])->toMatchArray(['dayOfWeek' => 'https://schema.org/Monday', 'opens' => '11:00', 'closes' => '23:00'])
+        ->and($data['address']['streetAddress'])->not->toBeEmpty();
+});
+
+it('додає на сторінку меню мікророзмітку лише з доступними стравами', function () {
+    $hidden = Dish::where('is_available', true)->first();
+    $hidden->update(['is_available' => false]);
+
+    $html = $this->get('/menu')->assertOk()->getContent();
+
+    preg_match('#<script type="application/ld\+json">(.+?)</script>#s', $html, $match);
+    $data = json_decode($match[1], true, flags: JSON_THROW_ON_ERROR);
+    $items = collect($data['hasMenuSection'])->flatMap(fn (array $section) => $section['hasMenuItem']);
+
+    expect($data['@type'])->toBe('Menu')
+        ->and($items)->toHaveCount(Dish::where('is_available', true)->count())
+        ->and($items->pluck('name'))->not->toContain($hidden->name)
+        ->and($items->first()['offers'])->toMatchArray(['priceCurrency' => 'UAH'])
+        ->and($items->first()['offers']['price'])->toMatch('/^\d+\.\d{2}$/');
+});
+
+it('віддає мапу сайту з публічними сторінками обома мовами', function () {
+    $xml = simplexml_load_string($this->get('/sitemap.xml')->assertOk()->assertHeader('Content-Type', 'application/xml; charset=UTF-8')->getContent());
+    $urls = collect();
+
+    foreach ($xml->url as $url) {
+        $urls->push((string) $url->loc);
+    }
+
+    expect($urls)->toHaveCount(14)
+        ->and($urls)->toContain(url('/'), url('/en'), url('/menu'), url('/en/menu'), url('/en/offer'))
+        ->and($urls->filter(fn (string $url) => str_contains($url, '/t/') || str_contains($url, '/pay/')))->toBeEmpty();
+});
+
+it('закриває в robots.txt службові сторінки й показує мапу сайту', function () {
+    $this->get('/robots.txt')
+        ->assertOk()
+        ->assertSee('Disallow: /admin')
+        ->assertSee('Disallow: /t/')
+        ->assertSee('Disallow: /booking/')
+        ->assertSee('Disallow: /en/booking/')
+        ->assertSee('Sitemap: '.url('/sitemap.xml'))
+        ->assertDontSee("Disallow: /booking\n", false);
+});

@@ -61,6 +61,11 @@ final class BookingSettings
         return self::get('max_guests');
     }
 
+    public static function reminderBefore(): int
+    {
+        return max(0, self::get('reminder_before'));
+    }
+
     public static function paymentHold(): int
     {
         return max(1, self::get('payment_hold'));

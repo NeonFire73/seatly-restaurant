@@ -24,13 +24,14 @@ use Illuminate\Support\Str;
  * @property CarbonImmutable $starts_at
  * @property CarbonImmutable $ends_at
  * @property CarbonImmutable|null $expires_at
+ * @property CarbonImmutable|null $reminded_at
  * @property CarbonImmutable|null $seated_at
  * @property CarbonImmutable|null $cancelled_at
  * @property int $fee_amount
  */
 #[Fillable([
     'code', 'token', 'table_id', 'guest_name', 'guest_phone', 'guest_email', 'guests_count',
-    'starts_at', 'ends_at', 'status', 'comment', 'locale', 'source', 'fee_amount', 'expires_at',
+    'starts_at', 'ends_at', 'status', 'comment', 'locale', 'source', 'fee_amount', 'expires_at', 'reminded_at',
     'seated_at', 'cancelled_at', 'cancel_reason', 'created_by',
 ])]
 class Reservation extends Model
@@ -92,6 +93,7 @@ class Reservation extends Model
             'starts_at' => 'immutable_datetime',
             'ends_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
+            'reminded_at' => 'immutable_datetime',
             'seated_at' => 'immutable_datetime',
             'cancelled_at' => 'immutable_datetime',
         ];

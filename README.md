@@ -1,58 +1,329 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Seatly Restaurant
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+[English version](README.en.md)
 
-## About Laravel
+Вебзастосунок вигаданого ресторану, який показує повний цикл роботи закладу: гість бронює столик онлайн і за бажанням замовляє страви наперед, у залі сканує QR-код на столику, бачить меню й свій рахунок, платить онлайн і лишає чайові, а персонал керує всім цим в адмін-панелі.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+> Портфоліо-проєкт. Ресторан вигаданий, платежі тестові: типово замість банку працює підставна платіжна сторінка, гроші не списуються.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Laravel 13 · Filament 5 · Livewire 4 · Tailwind CSS 4 · MySQL 8 · Pest
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 1. Можливості
 
-## Learning Laravel
+**Для гостя — без реєстрації**
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- Бронювання столика за кілька кроків: дата й час, столик на схемі залу, контакти, страви наперед (за бажанням), підтвердження. Лист із підтвердженням і подією для календаря, сторінка бронювання за особистим посиланням, скасування.
+- Попереднє замовлення страв на час візиту з оплатою онлайн — під час бронювання або пізніше.
+- Сторінка столика за QR-кодом: меню, рахунок зі статусами страв, оплата з чайовими, кнопка «Покликати офіціанта».
+- Дві мови: українська й англійська.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+**Для персоналу — адмін-панель за ролями**
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- **Офіціант:** сторінка «Зал» зі станами столиків, посадка гостей, замовлення, оплата готівкою чи терміналом, свої чайові.
+- **Кухня:** екран із чергою страв «Зараз» і попередніми замовленнями «До часу».
+- **Менеджер:** бронювання й розклад, меню, зали та столики з QR-кодами, платежі й повернення коштів, звіт по чайових, години роботи, дашборд із виторгом.
+- **Власник:** усе, що менеджер, а також вміст сайту (тексти, переклади, зображення, SEO), персонал і налаштування — зокрема платне бронювання та його ціна.
 
-## Agentic Development
+**Під капотом**
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- Оплата через Monobank Acquiring за змінним контрактом шлюзу, вебхуки з перевіркою підпису, повернення коштів.
+- Фонові задачі: нагадування гостям, звільнення неоплачених бронювань, позначка неявки, звірка статусів платежів.
+- 360+ автоматичних тестів, статичний аналіз (Larastan), перевірки в GitHub Actions.
+
+## 2. Сценарії за ролями
+
+Три маршрути, якими можна пройти проєкт за десять хвилин. Демо-записи й адреси — у [розділі 9](#9-вхід-і-демо-доступи); пароль усіх демо-користувачів — `password`.
+
+### Гість бронює столик
+
+1. Відкрийте сайт і натисніть «Забронювати» (або одразу `/booking`).
+2. Оберіть кількість гостей, дату й час, далі — вільний столик на схемі залу. Зайняті й замалі столики неактивні.
+3. Введіть ім'я, телефон та e-mail. На кроці «Страви» можна додати попереднє замовлення або пропустити його.
+4. Натисніть «Забронювати». Якщо додано страви — «Забронювати й оплатити»: відкриється тестова платіжна сторінка, оберіть «Оплатити успішно».
+5. Має з'явитися «Столик заброньовано» з номером бронювання й посиланням на сторінку бронювання, де його можна скасувати. Лист гостеві типово пишеться у `storage/logs/laravel.log`.
+6. Увійдіть в адмінку як `manager@seatly.test` — бронювання є в розділі «Бронювання», а оплачені страви — на сторінці «Кухня» в колонці «До часу».
+
+### Офіціант веде замовлення від посадки до кухні
+
+1. Увійдіть в адмінку як `waiter@seatly.test` і відкрийте «Зал».
+2. Натисніть вільний столик і «Посадити без бронювання» (або «Посадити» біля бронювання на сьогодні).
+3. У панелі столика знайдіть страву, вкажіть кількість і натисніть «Додати».
+4. В іншому вікні увійдіть як `kitchen@seatly.test`: страва вже в колонці «Зараз». Натисніть «Готується», потім «Готово» — картка зникає з екрана кухні.
+5. Поверніться до офіціанта: позиція має статус «Готово», кнопка «Подано» завершує її. Сторінки оновлюються самі раз на 10 секунд.
+
+### Гість платить за QR і лишає чайові
+
+1. Як `manager@seatly.test` відкрийте «Зали та столики» → «Столики» і натисніть «Показати QR» біля столика №2 або №5 — на них у демо-даних уже є відкриті замовлення. Скопіюйте адресу під кодом і відкрийте її в новій вкладці (це те, що гість побачив би, навівши камеру).
+2. На сторінці столика перейдіть на вкладку «Рахунок»: позиції, їхні статуси й сума до сплати.
+3. Натисніть «Оплатити», оберіть чайові (0, 5, 10, 15 % або своя сума) і «Перейти до оплати».
+4. На тестовій платіжній сторінці оберіть «Оплатити успішно».
+5. Має з'явитися підтвердження оплати з квитанцією. В адмінці: платіж — у розділі «Платежі», столик на сторінці «Зал» позначено сплаченим, чайові — у звіті «Чайові» навпроти офіціанта.
+
+## 3. Що цікавого в коді
+
+Місця, де проєкт складніший за CRUD. Кожна нотатка — на 2–3 хвилини читання: задача, чому вона непроста, рішення, файли, тести.
+
+| Тема | У чому складність | Нотатка |
+|---|---|---|
+| Подвійне бронювання | два гості одночасно беруть той самий столик і час | [читати](guide/01-podviine-broniuvannia.md) |
+| Розрахунок доступності | перерви між бронюваннями, закриття після півночі, особливі дні, часові пояси | [читати](guide/02-dostupnist.md) |
+| Платіжний шлюз | проєкт має працювати і з банком, і без токена та інтернету | [читати](guide/03-platizhnyi-shliuz.md) |
+| Вебхуки | приходять двічі, не за порядком або не приходять узагалі | [читати](guide/04-vebkhuky.md) |
+| Статуси | як не допустити «посадженого» скасованого бронювання | [читати](guide/05-statusy.md) |
+| Повернення й чайові | суми мають сходитися після будь-якої послідовності оплат і повернень | [читати](guide/06-povernennia-i-chaiovi.md) |
+| Передоплата | столик тримається 15 хвилин, а гроші можуть надійти на шістнадцятій | [читати](guide/07-peredoplata.md) |
+
+Зміст усіх нотаток — [guide/README.md](guide/README.md).
+
+## 4. Стек
+
+| Шар | Технологія |
+|---|---|
+| Мова й фреймворк | PHP 8.4, Laravel 13 |
+| Адмін-панель | Filament 5 |
+| Інтерактив на сайті | Livewire 4, Alpine.js |
+| Стилі та збірка | Tailwind CSS 4, Vite |
+| База даних | MySQL 8 |
+| Черги, кеш, сесії | драйвер `database` — без Redis та інших сервісів |
+| Платежі | Monobank Acquiring (тестовий режим) і підставний шлюз |
+| Тести та якість | Pest 4, Laravel Pint, Larastan (рівень 6), GitHub Actions |
+
+---
+
+Далі — інструкція для тих, хто розгортає проєкт у себе.
+
+## 5. Що потрібно встановити
+
+| Програма | Версія | Як перевірити | Де взяти |
+|---|---|---|---|
+| PHP | 8.3 або новіша (проєкт розробляється на 8.4) | `php -v` | https://www.php.net/downloads |
+| Composer | 2.x | `composer -V` | https://getcomposer.org/download/ |
+| Node.js | 22 або новіша | `node -v` | https://nodejs.org |
+| MySQL | 8.x | `mysql --version` | https://dev.mysql.com/downloads/ |
+
+Якщо у вас уже є готовий набір — OSPanel, Laragon, XAMPP чи Herd — PHP і MySQL у ньому є, досить окремо поставити Composer і Node.js (у Laragon і Herd вони теж уже є).
+
+Потрібні розширення PHP: `pdo_mysql`, `mbstring`, `openssl`, `curl`, `fileinfo`, `gd`, `intl`, `dom`. Перевіряти їх вручну не треба: команда встановлення скаже, якого бракує і як його ввімкнути.
+
+## 6. Швидкий старт
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone https://github.com/NeonFire73/seatly-restaurant.git
+cd seatly-restaurant
+composer run setup
+composer run dev
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Після цього сайт відкривається на http://localhost:8000, адмін-панель — на http://localhost:8000/admin.
 
-## Contributing
+## 7. Покрокове встановлення
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Крок 1. Завантажте проєкт.**
 
-## Code of Conduct
+```bash
+git clone https://github.com/NeonFire73/seatly-restaurant.git
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+cd seatly-restaurant
+```
 
-## Security Vulnerabilities
+З'явиться папка `seatly-restaurant` з кодом; усі подальші команди виконуються в ній.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+**Крок 2. Запустіть MySQL.** У OSPanel, Laragon чи XAMPP — кнопкою запуску в самій програмі. Порожню базу створювати заздалегідь не обов'язково: це запропонує наступний крок.
 
-## License
+**Крок 3. Запустіть встановлення.**
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+composer run setup
+```
+
+Команда завантажить бібліотеки PHP і запустить помічника, який:
+
+1. перевірить версію PHP і розширення;
+2. створить файл налаштувань `.env` і ключ застосунку;
+3. запитає доступ до бази — адресу сервера, порт, назву бази, користувача й пароль. На кожне запитання є запропонована відповідь; якщо не знаєте, що вводити, — див. [розділ 8](#8-база-даних);
+4. перевірить з'єднання і, якщо бази ще немає, запропонує її створити;
+5. створить таблиці й наповнить їх демо-даними (меню, столики, бронювання, історія замовлень за місяць);
+6. збере стилі та скрипти.
+
+Наприкінці має з'явитися «Готово» з адресами сайту й адмінки та переліком демо-користувачів. Якщо щось пішло не так, помічник пояснить причину й що зробити; команду можна запускати повторно — вона не затирає наявний `.env` і не видаляє дані без запиту.
+
+**Крок 4. Запустіть проєкт.**
+
+```bash
+composer run dev
+```
+
+Одна команда запускає одразу три процеси: вебсервер, обробник черги (він надсилає листи й обробляє вебхуки) і Vite. Не закривайте це вікно, поки працюєте з сайтом. Відкрийте http://localhost:8000.
+
+**Крок 5 (необов'язково). Фонові задачі.** Нагадування гостям, звільнення неоплачених бронювань і позначку «не прийшов» виконує планувальник. Щоб побачити їх у роботі, запустіть в окремому вікні:
+
+```bash
+php artisan schedule:work
+```
+
+**Якщо сайт працює на власному домені** (OSPanel, Laragon, Herd), `composer run dev` не потрібен: запишіть адресу сайту в `APP_URL` у файлі `.env`, а чергу запустіть командою `php artisan queue:work`.
+
+## 8. База даних
+
+**Що взагалі відбувається.** MySQL — це окрема програма-сервер, яка зберігає дані. Застосунок підключається до неї за адресою, назвою бази, логіном і паролем — вони записані у файлі `.env`. Порожню базу треба створити один раз, а таблиці в ній Laravel створить сам.
+
+**Як створити порожню базу** — будь-яким із трьох способів:
+
+- відповісти «так» на пропозицію команди встановлення — найпростіше;
+- у phpMyAdmin: вкладка «Бази даних» → назва `seatly`, кодування `utf8mb4_unicode_ci` → «Створити»;
+- однією командою в терміналі:
+
+```bash
+mysql -u root -p -e "CREATE DATABASE seatly CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+**Що написати в `.env`.** Команда встановлення записує ці значення сама; вручну вони змінюються так:
+
+| Змінна | Що означає | Де взяти значення |
+|---|---|---|
+| `DB_HOST` | адреса сервера MySQL | зазвичай `127.0.0.1`; в OSPanel 6 — назва модуля MySQL |
+| `DB_PORT` | порт сервера | типово `3306` |
+| `DB_DATABASE` | назва бази | та, яку ви створили, наприклад `seatly` |
+| `DB_USERNAME` | користувач MySQL | у локальних наборах — `root` |
+| `DB_PASSWORD` | пароль цього користувача | у локальних наборах зазвичай порожній |
+
+Типові значення для готових наборів:
+
+| Набір | `DB_HOST` | `DB_PORT` | `DB_USERNAME` | `DB_PASSWORD` |
+|---|---|---|---|---|
+| OSPanel 6 | назва модуля, наприклад `MySQL-8.4` | `3306` | `root` | порожній |
+| Laragon | `127.0.0.1` | `3306` | `root` | порожній |
+| XAMPP | `127.0.0.1` | `3306` | `root` | порожній |
+
+> Пастка OSPanel 6: адреса сервера там — це назва модуля MySQL (`MySQL-8.4`, `MySQL-8.0`), а не `localhost`. Вона працює лише тоді, коли OSPanel запущено. Значення для OSPanel перевірено на живій установці; для Laragon і XAMPP наведено їхні стандартні налаштування.
+
+**Як перевірити, що все працює:**
+
+```bash
+php artisan db:show
+```
+
+Має з'явитися таблиця з назвою бази, версією MySQL і переліком таблиць (`reservations`, `orders`, `payments` та інші). Якщо замість неї помилка — шукайте її нижче.
+
+**Типові помилки бази даних**
+
+| Що видно | Причина | Що зробити |
+|---|---|---|
+| `SQLSTATE[HY000] [2002]` — з'єднання відхилено | сервер MySQL не запущено або неправильні `DB_HOST` чи `DB_PORT` | запустити MySQL, звірити адресу й порт |
+| `SQLSTATE[HY000] [2002] ... getaddrinfo failed` | такої адреси сервера не існує (часто — `MySQL-8.4` без запущеного OSPanel) | вказати `127.0.0.1` або запустити OSPanel |
+| `SQLSTATE[HY000] [1045]` — доступ заборонено | неправильні логін або пароль | звірити `DB_USERNAME` і `DB_PASSWORD` |
+| `SQLSTATE[HY000] [1049]` — невідома база | базу не створено або помилка в назві | створити базу, звірити `DB_DATABASE` |
+| `could not find driver` | у PHP вимкнено розширення `pdo_mysql` | увімкнути його в `php.ini` (шлях показує `php --ini`), відкрити нове вікно термінала |
+| зміни в `.env` не діють | Laravel використовує збережену конфігурацію | `php artisan config:clear` |
+| таблиця вже існує / не існує | міграції виконано частково | `php artisan migrate:fresh --seed` (видаляє всі дані) |
+
+Ті самі пояснення дає й команда встановлення, коли не може підключитися.
+
+## 9. Вхід і демо-доступи
+
+| Що | Адреса |
+|---|---|
+| Сайт | http://localhost:8000 |
+| Англійська версія | http://localhost:8000/en |
+| Адмін-панель | http://localhost:8000/admin |
+
+| Роль | E-mail | Що бачить |
+|---|---|---|
+| Власник | `owner@seatly.test` | усе, зокрема «Контент сайту», «Персонал», «Налаштування» |
+| Менеджер | `manager@seatly.test` | бронювання, замовлення, платежі, меню, столики, години роботи |
+| Офіціант | `waiter@seatly.test`, `waiter2@seatly.test` | зал, бронювання на сьогодні, свої замовлення й чайові |
+| Кухня | `kitchen@seatly.test` | екран кухні та наявність страв |
+
+Пароль для всіх — `password` (змінна `DEMO_PASSWORD` у `.env`; діє на момент наповнення бази). У профілі працівника можна ввімкнути двофакторну автентифікацію.
+
+## 10. Як перевірити оплату
+
+**Типово — підставний шлюз** (`PAYMENT_GATEWAY=fake`). Замість сторінки банку відкривається тестова сторінка з кнопками «Оплатити успішно», «Відхилити платіж» і «Повернутися, не платячи». Нічого налаштовувати не треба: працює без токена й без інтернету, а весь код від створення платежу до закриття рахунку виконується той самий, що й зі справжнім банком.
+
+**Monobank у тестовому режимі.** Банк надсилає вебхуки на публічну адресу, тому потрібен тунель до вашого комп'ютера.
+
+1. Отримайте тестовий токен на https://api.monobank.ua/ і запишіть його в `MONOBANK_TOKEN`.
+2. Запустіть тунель, наприклад `cloudflared tunnel --url http://localhost:8000` або `ngrok http 8000`, і скопіюйте видану адресу.
+3. У `.env` вкажіть `PAYMENT_GATEWAY=monobank` і `MONOBANK_WEBHOOK_URL=https://<адреса тунелю>/webhooks/monobank`.
+4. Виконайте `php artisan config:clear`.
+
+Оплату з тестовим токеном Monobank автор наживо не перевіряв: інтеграцію звірено з документацією банку й покрито тестами на підмінених відповідях. Усі вебхуки видно в адмінці власника — розділ «Журнал вебхуків».
+
+## 11. Типові проблеми
+
+| Що бачу | Чому | Що зробити |
+|---|---|---|
+| `No application encryption key has been specified` | у `.env` порожній `APP_KEY` | `php artisan key:generate` |
+| `Vite manifest not found` | не зібрано стилі та скрипти | `npm install`, потім `npm run build` |
+| не показуються зображення | немає посилання на сховище файлів | `php artisan storage:link` |
+| помилка 419 після надсилання форми | сторінка була відкрита задовго до цього або `APP_URL` не збігається з адресою в браузері | оновити сторінку; звірити `APP_URL` і виконати `php artisan config:clear` |
+| листи не надходять | типово вони пишуться у файл; або не запущено обробник черги | шукайте лист у `storage/logs/laravel.log`; запустіть `composer run dev` або `php artisan queue:work` |
+| сповіщення в адмінці (дзвіночок) не з'являються | не запущено обробник черги | те саме |
+| неоплачене бронювання не зникає через 15 хвилин | не запущено планувальник | `php artisan schedule:work` |
+| в адмінці частина написів англійською | в українському перекладі Filament бракує рядків | це очікувано |
+| помилки бази даних | — | [розділ 8](#8-база-даних) |
+
+## 12. Корисні команди
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+Скидає базу до демо-стану: видаляє всі дані й наповнює заново.
+
+```bash
+composer run test
+```
+
+Запускає всі тести. Вони йдуть на SQLite в пам'яті й вашу базу не чіпають.
+
+```bash
+vendor/bin/pint
+```
+
+Форматує код за стилем проєкту.
+
+```bash
+vendor/bin/phpstan analyse --memory-limit=1G
+```
+
+Статичний аналіз (Larastan).
+
+```bash
+php artisan optimize:clear
+```
+
+Очищає кеш конфігурації, маршрутів і шаблонів — перше, що варто спробувати, коли «зміни не діють».
+
+```bash
+php artisan seatly:install --fresh
+```
+
+Повторне встановлення з нуля тими самими кроками, що й `composer run setup`.
+
+## 13. Як улаштовано проєкт
+
+| Каталог | Вміст |
+|---|---|
+| `app/Actions` | бізнес-операції: одна операція — один клас (`CreateReservation`, `SeatReservation`, `StartPayment`, `RefundPayment`) |
+| `app/Services` | розрахунок доступності, платіжні шлюзи, звіти, вміст сайту |
+| `app/Models`, `app/Enums` | моделі та перелічення статусів із правилами переходів |
+| `app/Livewire` | інтерактивні сторінки сайту: меню, майстер бронювання, сторінка столика, результат оплати |
+| `app/Filament` | адмін-панель: ресурси, сторінки «Зал», «Кухня», «Налаштування», віджети дашборда |
+| `app/Policies` | хто що може: правила доступу за ролями |
+| `app/Console/Commands` | фонові задачі й команда встановлення |
+| `resources/views`, `lang` | шаблони й тексти інтерфейсу двома мовами |
+| `tests/Feature` | тести, згруповані так само, як код |
+| `guide` | інженерні нотатки |
+
+Головне правило: логіки немає в контролерах, компонентах Livewire й ресурсах Filament — вони лише викликають дії з `app/Actions`. Тому бронювання із сайту й бронювання, яке менеджер вносить в адмінці, проходять однакові перевірки.
+
+Основні таблиці: `halls` → `tables` → `reservations` та `orders` → `order_items`; `payments` належать замовленню, бронюванню або обом; `dishes` згруповані в `menu_categories`; `users` — персонал із ролями; `settings`, `working_hours`, `special_days` — налаштування закладу; `content_blocks`, `pages`, `gallery_images`, `seo_entries` — вміст сайту. Гроші зберігаються цілими числами в копійках, час — в UTC, а показується за Києвом.
+
+Подробиці найцікавіших місць — в [інженерних нотатках](guide/README.md).
+
+## 14. Джерела й ліцензія
+
+Код поширюється за ліцензією MIT. Назва, меню й тексти ресторану вигадані. Фотографій у репозиторії немає: блоки сайту працюють без зображень, а власні можна завантажити в адмінці, розділ «Контент сайту».

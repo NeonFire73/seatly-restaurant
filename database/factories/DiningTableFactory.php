@@ -19,7 +19,8 @@ class DiningTableFactory extends Factory
     {
         return [
             'hall_id' => Hall::factory(),
-            'number' => (string) fake()->unique()->numberBetween(1, 999),
+            // Від 1000: тести задають столикам малі номери явно, і випадковий номер не має з ними збігатися
+            'number' => (string) fake()->unique()->numberBetween(1000, 9999),
             'seats' => 4,
             'min_guests' => 1,
             'shape' => TableShape::Square,

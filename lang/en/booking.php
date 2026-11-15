@@ -210,6 +210,13 @@ return [
             'title' => 'Your pre-order is paid',
             'intro' => 'We have received the payment for the pre-order for booking :code. The dishes will be served on :date at :time.',
         ],
+        'reminder' => [
+            'subject' => 'A reminder about booking :code',
+            'title' => 'See you today',
+            'intro' => 'A quick reminder: your table is waiting for you today at :time.',
+            'preorder' => 'Your pre-order is paid — the dishes will be ready when you arrive.',
+            'outro' => 'If your plans have changed, you can cancel the booking on its page.',
+        ],
         'cancelled' => [
             'subject' => 'Booking :code cancelled',
             'title' => 'Booking cancelled',

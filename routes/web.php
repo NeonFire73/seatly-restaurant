@@ -6,6 +6,7 @@ use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\PageController;
 use App\Http\Controllers\Site\PaymentController;
 use App\Http\Controllers\Site\ReservationController;
+use App\Http\Controllers\Site\SeoController;
 use App\Http\Controllers\Site\TableController;
 use App\Http\Controllers\Webhooks\MonobankWebhookController;
 use App\Http\Middleware\SetLocale;
@@ -38,6 +39,9 @@ foreach (Localization::locales() as $locale) {
         Route::prefix($locale)->name("{$locale}.")->middleware(SetLocale::class.':'.$locale)->group($publicRoutes);
     }
 }
+
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 // Вебхук платіжного провайдера (частина 2, п. 6.4): без сесії, cookie та CSRF — запит надсилає банк, а не браузер
 Route::post('/webhooks/monobank', MonobankWebhookController::class)
